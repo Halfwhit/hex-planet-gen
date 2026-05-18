@@ -1,0 +1,10 @@
+# Godot editor data
+.godot/
+
+# Export presets (may contain sensitive paths)
+export_presets.cfg
+
+# Mono/C# build artifacts
+.mono/
+data_*/
+mono_crash.*.json
