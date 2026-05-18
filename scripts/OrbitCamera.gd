@@ -3,6 +3,9 @@ extends Node3D
 
 
 signal zoom_changed(distance: float)
+signal drag_started
+
+const MAX_PITCH: float = PI * 0.48
 
 @export var min_distance: float = 3.0
 @export var max_distance: float = 12.0
@@ -27,6 +30,8 @@ func _input(event: InputEvent) -> void:
 		match mb.button_index:
 			MOUSE_BUTTON_LEFT:
 				_dragging = mb.pressed
+				if _dragging:
+					drag_started.emit()
 			MOUSE_BUTTON_WHEEL_UP:
 				_set_distance(_distance - zoom_speed)
 			MOUSE_BUTTON_WHEEL_DOWN:
@@ -35,12 +40,22 @@ func _input(event: InputEvent) -> void:
 		var mm: InputEventMouseMotion = event as InputEventMouseMotion
 		_yaw -= mm.relative.x * orbit_speed
 		_pitch -= mm.relative.y * orbit_speed
-		_pitch = clamp(_pitch, -PI * 0.48, PI * 0.48)
+		_pitch = clamp(_pitch, -MAX_PITCH, MAX_PITCH)
 		rotation = Vector3(_pitch, _yaw, 0.0)
 
 
 func get_distance() -> float:
 	return _distance
+
+
+func set_angles(pitch: float, yaw: float) -> void:
+	_pitch = clamp(pitch, -MAX_PITCH, MAX_PITCH)
+	_yaw = yaw
+	rotation = Vector3(_pitch, _yaw, 0.0)
+
+
+func set_angles_from_dir(dir: Vector3) -> void:
+	set_angles(-asin(clamp(dir.y, -1.0, 1.0)), atan2(dir.x, dir.z))
 
 
 func set_distance_limits(p_min: float, p_max: float) -> void:
