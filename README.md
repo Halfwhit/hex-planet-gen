@@ -16,6 +16,9 @@ Open `project.godot` in Godot 4 and press **Play** (F5).
 |-------|--------|
 | Left-drag | Orbit camera |
 | Scroll wheel | Zoom in / out |
+| Hover over tile (LOD 3 only) | White outline highlights the tile |
+| Click tile (LOD 3 only) | Blue outline selects the tile; camera locks on and tracks it as the planet rotates |
+| Left-drag (while locked) | Unlocks camera and resumes free orbit |
 
 ## Inspector properties
 
@@ -45,8 +48,12 @@ Four LOD levels are generated at startup. The active level switches automaticall
 |-----|-------------|-------|----------------|
 | 0 | 2 | 162 | > 7.0 |
 | 1 | 3 | 642 | > 5.0 |
-| 2 | 4 | 2 562 | > 3.0 |
-| 3 | 5 | 10 242 | ≤ 3.0 |
+| 2 | 4 | 2 562 | > 4.0 |
+| 3 | 5 | 10 242 | ≤ 4.0 |
+
+Selecting a tile resets when the LOD switches, as cell indices do not correspond across resolutions.
+
+At LOD 3 the camera rotates with the planet automatically, as if standing on the surface. Dragging still orbits freely; the planet-relative position is maintained once dragging stops.
 
 ## Planned steps
 

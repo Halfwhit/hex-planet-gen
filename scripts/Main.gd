@@ -5,7 +5,7 @@ extends Node3D
 const LOD_SUBDIVISIONS: Array[int] = [2, 3, 4, 5]
 # Camera distance thresholds; closer than each threshold → higher LOD.
 # At the default start distance of 5.0 this opens at LOD 2 (2562 cells).
-const LOD_THRESHOLDS: Array[float] = [7.0, 5.0, 3.0]
+const LOD_THRESHOLDS: Array[float] = [7.0, 5.0, 4.0]
 
 const _HORIZON_SHADER: Shader = preload("res://shaders/HorizonMask.gdshader")
 const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
@@ -39,12 +39,16 @@ var _gen_btn: Callable = _editor_generate
 
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
+var _lod_cells: Array = []
 var _rotation_speed_rad: float = 0.0
 var _spin_axis: Vector3 = Vector3.ZERO
+var _lock_cell_local: Vector3 = Vector3.ZERO
+var _locking: bool = false
 
 @onready var lod_label: Label = $UI/LODLabel
 @onready var orbit_camera: OrbitCamera = $OrbitCamera
 @onready var planet_mesh_instance: MeshInstance3D = $PlanetMesh
+@onready var planet_gridmap: PlanetGridmap = $PlanetGridmap
 
 
 func _ready() -> void:
@@ -57,6 +61,8 @@ func _ready() -> void:
 	_create_axis_display()
 	orbit_camera.set_distance_limits(planet_radius * 1.1, planet_radius * 6.0)
 	orbit_camera.zoom_changed.connect(_on_zoom_changed)
+	planet_gridmap.cell_selected.connect(_on_cell_selected)
+	orbit_camera.drag_started.connect(func() -> void: _locking = false)
 	_on_zoom_changed(orbit_camera.get_distance())
 
 
@@ -64,6 +70,13 @@ func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return
 	planet_mesh_instance.rotate(_spin_axis, _rotation_speed_rad * delta)
+	if _locking:
+		orbit_camera.set_angles_from_dir(
+				(planet_mesh_instance.global_transform.basis * _lock_cell_local).normalized())
+	elif _current_lod == 3:
+		# At LOD 3 the camera rotates with the planet surface each frame.
+		orbit_camera.set_angles_from_dir(
+				orbit_camera.global_transform.basis.z.rotated(_spin_axis, _rotation_speed_rad * delta))
 
 
 func _editor_generate() -> void:
@@ -99,12 +112,14 @@ func _generate_planet() -> void:
 	var sea_level: float = _compute_sea_level(noise)
 
 	_lod_meshes.clear()
+	_lod_cells.clear()
 	for sub: int in LOD_SUBDIVISIONS:
 		var ico: IcoSphere = IcoSphere.new()
 		ico.generate(sub)
 		var planet: HexPlanet = HexPlanet.new()
 		planet.generate(ico, noise, sea_level, noise_scale)
 		_lod_meshes.append(PlanetMesh.build(planet, planet_radius))
+		_lod_cells.append(planet.cells)
 
 	_current_lod = -1  # force _set_lod(0) to apply unconditionally
 	_set_lod(0)
@@ -115,8 +130,11 @@ func _set_lod(lod: int) -> void:
 		return
 	_current_lod = lod
 	planet_mesh_instance.mesh = _lod_meshes[_current_lod]
+	var cells: Array = _lod_cells[_current_lod] if _current_lod == 3 else []
+	planet_gridmap.setup(orbit_camera.camera, planet_mesh_instance, cells, planet_radius)
+	_locking = false
 	if lod_label:
-		lod_label.text = "LOD %d  (%d cells)" % [lod, _cell_count(lod)]
+		lod_label.text = "LOD %d  (%d cells)" % [lod, (_lod_cells[_current_lod] as Array).size()]
 
 
 func _make_noise() -> FastNoiseLite:
@@ -200,7 +218,11 @@ func _create_axis_display() -> void:
 	add_child(mi)
 
 
-func _cell_count(lod: int) -> int:
-	# Vertices of subdivided icosphere: 10 * 4^n + 2
-	var n: int = LOD_SUBDIVISIONS[lod]
-	return 10 * (1 << (2 * n)) + 2
+func _on_cell_selected(idx: int) -> void:
+	if idx < 0:
+		_locking = false
+		return
+	var cell: Dictionary = _lod_cells[_current_lod][idx] as Dictionary
+	_lock_cell_local = cell["position"] as Vector3
+	_locking = true
+	print("Selected cell %d — type: %s  height: %.3f" % [idx, cell.get("type", "?"), cell.get("height", 0.0)])
