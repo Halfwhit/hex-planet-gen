@@ -1,0 +1,6 @@
+res://scenes/Main.tscn
+res://scripts/HexPlanet.gd
+res://scripts/Main.gd
+res://scripts/PlanetMesh.gd
+res://shaders/HorizonMask.gdshader
+res://shaders/Planet.gdshader
