@@ -34,10 +34,15 @@ const BIOME_COASTAL_OCEAN: int = 17
 
 ## Each element is a Dictionary with keys:
 ##   position, polygon, height, type, pentagon,
-##   temperature, moisture, biome
+##   temperature, moisture, biome, plate_id, plate_oceanic
 var cells: Array[Dictionary] = []
 var land_threshold: float = 0.0
 var noise_scale: float = 1.0
+var num_plates: int = 0
+
+# Tectonic data retained after generation for debug visualisation.
+var _cell_plate: Array[int] = []
+var _plate_is_oceanic: Array[bool] = []
 
 
 func generate(
@@ -51,7 +56,10 @@ func generate(
 		p_detail_strength: float = 0.15,
 ) -> void:
 	noise_scale = p_noise_scale
+	num_plates = p_num_plates
 	cells = []
+	_cell_plate.clear()
+	_plate_is_oceanic.clear()
 
 	# Moisture noise uses a prime-offset seed so it is uncorrelated with the
 	# terrain height noise while remaining fully deterministic.
@@ -125,6 +133,9 @@ func generate(
 			"temperature": 0.5,
 			"moisture": 0.5,
 			"biome": BIOME_SHALLOW_OCEAN,
+			# Tectonic plate data (for debug visualisation).
+			"plate_id": _cell_plate[vi],
+			"plate_oceanic": _plate_is_oceanic[_cell_plate[vi]],
 		})
 
 	# Pass 2 — climate and biome.
@@ -366,6 +377,10 @@ func _build_tectonic_heights(
 		var base: float = (OCEAN_BASE if plate_is_oceanic[pi] else LAND_BASE) + plate_height_var[pi]
 		var detail: float = noise.get_noise_3dv(ico.vertices[vi] * p_noise_scale) * p_detail_strength
 		heights[vi] = clamp(base + propagated[vi] + detail, -1.0, 1.0)
+
+	# Retain plate data on the HexPlanet instance for debug visualisation.
+	_cell_plate = cell_plate
+	_plate_is_oceanic = plate_is_oceanic
 	return heights
 
 

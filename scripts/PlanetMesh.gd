@@ -2,7 +2,7 @@ class_name PlanetMesh
 extends RefCounted
 
 
-static func build(planet: HexPlanet, radius: float, highlight_pentagons: bool = false) -> ArrayMesh:
+static func build(planet: HexPlanet, radius: float, highlight_pentagons: bool = false, debug_plates: bool = false) -> ArrayMesh:
 	var st: SurfaceTool = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
@@ -12,13 +12,21 @@ static func build(planet: HexPlanet, radius: float, highlight_pentagons: bool = 
 		var cell_normal: Vector3 = cell["position"] as Vector3
 		var poly: PackedVector3Array = cell["polygon"] as PackedVector3Array
 		var n: int = poly.size()
-		var color: Color = terrain_color(
-			cell["height"] as float,
-			cell["type"] as int,
-			planet.land_threshold,
-			highlight_pentagons and cell["pentagon"] as bool,
-			cell.get("biome", -1) as int,
-		)
+		var color: Color
+		if debug_plates:
+			color = _plate_color(
+				cell.get("plate_id", 0) as int,
+				cell.get("plate_oceanic", false) as bool,
+				planet.num_plates,
+			)
+		else:
+			color = terrain_color(
+				cell["height"] as float,
+				cell["type"] as int,
+				planet.land_threshold,
+				highlight_pentagons and cell["pentagon"] as bool,
+				cell.get("biome", -1) as int,
+			)
 
 		st.set_normal(cell_normal)
 		st.set_color(color)
@@ -129,3 +137,15 @@ static func _biome_color(
 
 	# Fallback — should never be reached.
 	return Color(1.0, 0.0, 1.0)
+
+
+## Debug: colour each plate with a visually distinct hue.
+## Uses the golden-ratio hue sequence so adjacent plate IDs are maximally
+## different in colour.  Oceanic plates are rendered darker and more
+## saturated; continental plates are brighter so the two types read apart
+## at a glance.
+static func _plate_color(plate_id: int, plate_oceanic: bool, _num_plates: int) -> Color:
+	var hue: float = fmod(float(plate_id) * 0.618033988, 1.0)
+	if plate_oceanic:
+		return Color.from_hsv(hue, 0.70, 0.50)
+	return Color.from_hsv(hue, 0.55, 0.85)

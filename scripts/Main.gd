@@ -56,6 +56,8 @@ var _gen_btn: Callable = _editor_generate
 @export_range(2, 5) var editor_preview_subdivisions: int = 3
 ## Highlight the 12 pentagon tiles in magenta for debugging purposes.
 @export var debug_pentagons: bool = false
+## Colour cells by tectonic plate instead of biome (bright = continental, dark = oceanic).
+@export var debug_plates: bool = false
 
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
@@ -149,7 +151,7 @@ func _editor_generate() -> void:
 	var planet: HexPlanet = HexPlanet.new()
 	planet.generate(ico, noise, noise_scale, ocean_fraction,
 			num_plates, oceanic_plate_fraction, mountain_height, detail_noise_strength)
-	planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons)
+	planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons, debug_plates)
 
 	for child_name: String in ["HorizonMask", "Atmosphere", "RotationAxis", "TrueNorthAxis"]:
 		var old: Node = get_node_or_null(child_name)
@@ -178,7 +180,7 @@ func _generate_planet() -> void:
 		var planet: HexPlanet = HexPlanet.new()
 		planet.generate(ico, noise, noise_scale, ocean_fraction,
 				num_plates, oceanic_plate_fraction, mountain_height, detail_noise_strength)
-		_lod_meshes.append(PlanetMesh.build(planet, planet_radius, debug_pentagons))
+		_lod_meshes.append(PlanetMesh.build(planet, planet_radius, debug_pentagons, debug_plates))
 		_lod_cells.append(planet.cells)
 		# Use the highest-LOD threshold for local-map rendering (most accurate).
 		_land_threshold = planet.land_threshold
