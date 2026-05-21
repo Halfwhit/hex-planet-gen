@@ -481,8 +481,11 @@ static func _classify_biome(
 	var alt: float = clamp(
 			(height - land_threshold) / max(1.0 - land_threshold, 0.001), 0.0, 1.0)
 
-	# Very high alpine — always ice or snow regardless of latitude.
+	# Very high alpine.  Coastal cliffs become rocky mountain rather than
+	# snow/ice so that white tiles never sit directly on the waterline.
 	if alt > 0.82:
+		if near_ocean:
+			return BIOME_MOUNTAIN
 		return BIOME_ICE if temperature < 0.25 else BIOME_SNOW
 
 	# Polar ice cap.
@@ -493,12 +496,11 @@ static func _classify_biome(
 	if temperature < 0.08:
 		return BIOME_TUNDRA
 
-	# Rocky mountains at moderate altitude (below the snow line).
-	# No near_ocean gate — coastal ranges like the Andes and Cascades rise
-	# straight from the sea.  Beach is gated on alt < 0.02 separately so
-	# there is no overlap.
+	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
 	if alt > 0.45:
-		return BIOME_SNOW if temperature < 0.32 else BIOME_MOUNTAIN
+		if near_ocean or temperature >= 0.32:
+			return BIOME_MOUNTAIN
+		return BIOME_SNOW
 
 	# Boreal / taiga zone.
 	if temperature < 0.38:
