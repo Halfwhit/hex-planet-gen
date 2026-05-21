@@ -11,6 +11,7 @@ const LOD_THRESHOLDS: Array[float] = [3.5, 2.5, 2.0]
 
 const _HORIZON_SHADER: Shader = preload("res://shaders/HorizonMask.gdshader")
 const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
+const _HEX_MAP_2D_SCRIPT: GDScript = preload("res://scripts/HexMap2D.gd")
 
 @export var planet_radius: float = 2.0
 ## Fraction of the planet surface that will be ocean (0 = all land, 1 = all ocean).
@@ -56,6 +57,7 @@ var _tilt_basis: Basis = Basis.IDENTITY
 var _lock_cell_local: Vector3 = Vector3.ZERO
 var _locking: bool = false
 var _local_map: LocalMap = null
+var _hex_map_2d: Control = null
 
 @onready var lod_label: Label = $UI/LODLabel
 @onready var orbit_camera: OrbitCamera = $OrbitCamera
@@ -90,6 +92,15 @@ func _ready() -> void:
 	var map_layer: CanvasLayer = CanvasLayer.new()
 	map_layer.layer = 10
 	add_child(map_layer)
+
+	_hex_map_2d = _HEX_MAP_2D_SCRIPT.new()
+	_hex_map_2d.anchor_left = 0.01
+	_hex_map_2d.anchor_right = 0.56
+	_hex_map_2d.anchor_top = 0.05
+	_hex_map_2d.anchor_bottom = 0.95
+	map_layer.add_child(_hex_map_2d)
+	_hex_map_2d.hide()
+
 	_local_map = LocalMap.new()
 	_local_map.rings = map_rings
 	_local_map.debug_pentagons = debug_pentagons
@@ -175,6 +186,8 @@ func _set_lod(lod: int) -> void:
 	_locking = false
 	if _local_map != null:
 		_local_map.hide()
+	if _hex_map_2d != null:
+		_hex_map_2d.hide()
 	if lod_label:
 		lod_label.text = "LOD %d  (%d cells)" % [lod, (_lod_cells[_current_lod] as Array).size()]
 
@@ -299,6 +312,16 @@ func _show_local_map(idx: int) -> void:
 	)
 	_local_map.show()
 
+	var cell: Dictionary = _lod_cells[_current_lod][idx] as Dictionary
+	_hex_map_2d.call("setup",
+		cell["type"] as int,
+		cell["height"] as float,
+		_land_threshold,
+		_local_map.get_ring1_data(),
+		noise_seed + idx,
+	)
+	_hex_map_2d.show()
+
 
 func _on_cell_selected(idx: int) -> void:
 	if idx < 0:
@@ -320,3 +343,4 @@ func _on_cell_occupied(idx: int) -> void:
 
 func _on_cell_vacated(idx: int) -> void:
 	_local_map.hide()
+	_hex_map_2d.hide()

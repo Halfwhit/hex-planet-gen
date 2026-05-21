@@ -69,6 +69,26 @@ func setup(
 	queue_redraw()
 
 
+## Returns the 6 ring-1 neighbour types and heights in HEX_DIRS / EDGE_SLOTS order.
+## Each element is a Dictionary {"type": int, "height": float}.
+## Call after setup() so _region is populated.  Used by HexMap2D to seed its border terrain.
+func get_ring1_data() -> Array:
+	var result: Array = []
+	for i: int in 6:
+		result.append({"type": HexPlanet.OCEAN, "height": -0.5})  # safe ocean default
+	for entry: Dictionary in _region:
+		var q: int = entry["q"] as int
+		var r: int = entry["r"] as int
+		if (abs(q) + abs(r) + abs(q + r)) / 2 != 1:
+			continue
+		var coord: Vector2i = Vector2i(q, r)
+		for i: int in HEX_DIRS.size():
+			if (HEX_DIRS[i] as Vector2i) == coord:
+				result[i] = {"type": entry["type"] as int, "height": entry["height"] as float}
+				break
+	return result
+
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), bg_color, true)
 
