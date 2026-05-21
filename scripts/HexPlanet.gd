@@ -154,7 +154,7 @@ func generate(
 		var queue: Array[int] = [vi]
 		ocean_visited[vi] = true
 		while not queue.is_empty():
-			var curr: int = queue.pop_front()
+			var curr: int = queue.pop_back()
 			component.append(curr)
 			for fi: int in (vertex_to_faces[curr] as Array):
 				for vj: int in (ico.faces[fi] as Array):
