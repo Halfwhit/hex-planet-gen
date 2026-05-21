@@ -93,6 +93,8 @@ static func _biome_color(
 			return Color(0.02, 0.42, 0.60).lerp(Color(0.08, 0.64, 0.78), 1.0 - od)
 		HexPlanet.BIOME_ICY_OCEAN:
 			return Color(0.50, 0.62, 0.72).lerp(Color(0.68, 0.80, 0.88), 1.0 - od)
+		HexPlanet.BIOME_COASTAL_OCEAN:
+			return Color(0.18, 0.58, 0.70).lerp(Color(0.28, 0.70, 0.82), 1.0 - od)
 		# ── Coastal ───────────────────────────────────────────────────────
 		HexPlanet.BIOME_BEACH:
 			return Color(0.78, 0.70, 0.46).lerp(Color(0.90, 0.82, 0.60), la)

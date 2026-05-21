@@ -29,6 +29,8 @@ const BIOME_TUNDRA: int = 13
 const BIOME_MOUNTAIN: int = 14
 const BIOME_SNOW: int = 15
 const BIOME_ICE: int = 16
+## Shoreline ocean — very shallow band right at the waterline:
+const BIOME_COASTAL_OCEAN: int = 17
 
 ## Each element is a Dictionary with keys:
 ##   position, polygon, height, type, pentagon,
@@ -194,8 +196,12 @@ static func _classify_biome(
 	if type == OCEAN:
 		if temperature < 0.15:
 			return BIOME_ICY_OCEAN
-		if (land_threshold - height) > 0.35:
+		var depth: float = land_threshold - height  # positive = below sea level
+		if depth > 0.35:
 			return BIOME_DEEP_OCEAN
+		# Coastal band — thin turquoise strip right at the waterline.
+		if depth < 0.08:
+			return BIOME_COASTAL_OCEAN
 		if temperature > 0.60:
 			return BIOME_TROPICAL_OCEAN
 		return BIOME_SHALLOW_OCEAN
@@ -226,7 +232,7 @@ static func _classify_biome(
 
 	# Coastal beach — warm, low-lying, ocean-adjacent.
 	# Tight altitude cap keeps beaches as a narrow strip right at the waterline.
-	var coastal: bool = near_ocean and alt < 0.04
+	var coastal: bool = near_ocean and alt < 0.02
 
 	# Temperate zone.
 	if temperature < 0.60:
