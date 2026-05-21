@@ -97,6 +97,7 @@ func generate(
 		vertex_to_faces[f[1]].append(fi)
 		vertex_to_faces[f[2]].append(fi)
 
+
 	# Tectonic pass — simulate plate interactions to derive per-cell heights.
 	# Sea level is then computed from the actual height distribution so that
 	# ocean_fraction is honoured regardless of seed or plate configuration.
@@ -105,6 +106,7 @@ func generate(
 			noise, p_noise_scale,
 			p_num_plates, p_oceanic_plate_fraction,
 			p_mountain_height, p_detail_strength)
+
 
 	var sorted_h: Array[float] = tectonic_h.duplicate()
 	sorted_h.sort()
@@ -140,40 +142,54 @@ func generate(
 			"plate_oceanic": _plate_is_oceanic[_cell_plate[vi]],
 		})
 
-	# ── Lake detection ───────────────────────────────────────────────────────
-	# Assign every ocean cell a component ID, track each component's size,
-	# then mark every non-largest component as a lake.
-	# No component-cell lists are stored — only one int per vertex.
-	var comp_id: Array[int] = []
-	comp_id.resize(n_verts)
-	for i: int in n_verts:
-		comp_id[i] = -1
 
-	var comp_sizes: Array[int] = []
+	# ── Lake detection ───────────────────────────────────────────────────────
+	# Flood-fill ocean connectivity.  Uses PackedByteArray / PackedInt32Array
+	# so the inner BFS loop avoids slow GDScript typed-array overhead and
+	# never touches Dictionary fields in its hot path.
+	#
+	# vert_ocean[i] = 1 if ocean, 0 if land — built once from cells[] then
+	# used instead of per-step dictionary lookups.
+	var vert_ocean: PackedByteArray = PackedByteArray()
+	vert_ocean.resize(n_verts)
+	for vi: int in n_verts:
+		if (cells[vi] as Dictionary)["type"] == OCEAN:
+			vert_ocean[vi] = 1
+
+	# comp_id: -1 = unvisited, ≥0 = component index.
+	# PackedInt32Array.fill() is a C-level memset — much faster than a GDScript loop.
+	var comp_id: PackedInt32Array = PackedInt32Array()
+	comp_id.resize(n_verts)
+	comp_id.fill(-1)
+
+	var comp_sizes: PackedInt32Array = PackedInt32Array()
 	var next_comp: int = 0
 
 	for vi: int in n_verts:
-		if comp_id[vi] >= 0 or (cells[vi] as Dictionary)["type"] as int != OCEAN:
+		if comp_id[vi] >= 0 or vert_ocean[vi] == 0:
 			continue
-		var queue: Array[int] = [vi]
+		# Use a PackedInt32Array as a growing queue with a read-head pointer
+		# so we never shrink the backing buffer mid-BFS (no per-pop allocation).
+		var queue: PackedInt32Array = PackedInt32Array()
+		queue.append(vi)
 		comp_id[vi] = next_comp
-		var sz: int = 0
-		while not queue.is_empty():
-			var curr: int = queue.pop_back()
-			sz += 1
+		var head: int = 0
+		while head < queue.size():
+			var curr: int = queue[head]
+			head += 1
 			for fi: int in (vertex_to_faces[curr] as Array):
 				for vj: int in (ico.faces[fi] as Array):
-					if comp_id[vj] == -1 and \
-							(cells[vj] as Dictionary)["type"] as int == OCEAN:
+					if comp_id[vj] == -1 and vert_ocean[vj] == 1:
 						comp_id[vj] = next_comp
 						queue.append(vj)
-		comp_sizes.append(sz)
+		comp_sizes.append(head)  # head == number of cells visited
 		next_comp += 1
 
 	var main_comp: int = 0
 	for i: int in comp_sizes.size():
 		if comp_sizes[i] > comp_sizes[main_comp]:
 			main_comp = i
+
 
 	# comp_id is checked directly in pass 2 — no dictionary needed.
 
@@ -245,6 +261,7 @@ func generate(
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
 		cell["biome"] = BIOME_LAKE if (comp_id[vi] >= 0 and comp_id[vi] != main_comp) else biome
+
 
 
 ## Simulate plate tectonics and return per-vertex heights.
