@@ -382,11 +382,10 @@ func _build_tectonic_heights(
 				if conv > 0.0:
 					if not my_oceanic and not nb_oceanic:
 						# Continental-continental collision — Himalaya / Alps style.
-						eff = conv * p_mountain_height * 1.8
+						eff = conv * p_mountain_height * 1.3
 					elif not my_oceanic:
 						# Continental overriding oceanic — Andes / Cascades style.
-						# 1.3× boost so Andes-style arcs produce visible ranges.
-						eff = conv * p_mountain_height * 1.3
+						eff = conv * p_mountain_height * 1.1
 					elif not nb_oceanic:
 						eff = -conv * 0.45  # subduction trench (oceanic side)
 					else:
@@ -503,10 +502,11 @@ static func _classify_biome(
 		return BIOME_TUNDRA
 
 	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
-	# Snow threshold 0.50: tropical mountains (lat < ~0.27) stay rocky grey;
-	# mid-latitude and polar mountains get snow once altitude cooling brings
-	# temperature below 0.50.
-	if alt > 0.45:
+	# alt > 0.52 clips the low-elevation skirts that were making ranges too
+	# wide; those border cells fall through to forest/grassland instead.
+	# Snow threshold 0.50: tropical mountains stay rocky; mid-latitude and
+	# polar mountains get snow once altitude cooling brings temp below 0.50.
+	if alt > 0.52:
 		if near_ocean or temperature >= 0.50:
 			return BIOME_MOUNTAIN
 		return BIOME_SNOW
