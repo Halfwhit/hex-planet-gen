@@ -376,11 +376,11 @@ func _build_tectonic_heights(
 				if conv > 0.0:
 					if not my_oceanic and not nb_oceanic:
 						# Continental-continental collision — Himalaya / Alps style.
-						# Extra multiplier (1.5×) produces the tallest ranges.
-						eff = conv * p_mountain_height * 1.5
+						eff = conv * p_mountain_height * 1.8
 					elif not my_oceanic:
 						# Continental overriding oceanic — Andes / Cascades style.
-						eff = conv * p_mountain_height
+						# 1.3× boost so Andes-style arcs produce visible ranges.
+						eff = conv * p_mountain_height * 1.3
 					elif not nb_oceanic:
 						eff = -conv * 0.45  # subduction trench (oceanic side)
 					else:
@@ -487,17 +487,19 @@ static func _classify_biome(
 		return BIOME_ICE if temperature < 0.25 else BIOME_SNOW
 
 	# Polar ice cap.
-	if temperature < 0.05:
+	if temperature < 0.03:
 		return BIOME_ICE
 
 	# Sub-polar tundra.
-	if temperature < 0.13:
+	if temperature < 0.08:
 		return BIOME_TUNDRA
 
 	# Rocky mountains at moderate altitude (below the snow line).
 	# Temperature is not gated here — altitude alone determines mountain biome
 	# so tropical ranges (Andes, Himalayas) are classified correctly.
-	if alt > 0.58 and not near_ocean:
+	# Threshold at 0.45 (was 0.58) so that C-O collision ranges (Andes style)
+	# are wide enough to be clearly visible.
+	if alt > 0.45 and not near_ocean:
 		return BIOME_SNOW if temperature < 0.32 else BIOME_MOUNTAIN
 
 	# Boreal / taiga zone.
