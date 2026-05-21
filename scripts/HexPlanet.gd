@@ -237,9 +237,9 @@ func generate(
 		# mid-latitude moderate → polar dry.
 		var base_m: float
 		if lat < 0.15:
-			base_m = 0.50
+			base_m = 0.44
 		elif lat < 0.35:
-			base_m = lerpf(0.50, 0.20, (lat - 0.15) / 0.20)
+			base_m = lerpf(0.44, 0.20, (lat - 0.15) / 0.20)
 		elif lat < 0.60:
 			base_m = lerpf(0.20, 0.50, (lat - 0.35) / 0.25)
 		else:
@@ -249,7 +249,7 @@ func generate(
 		var ocean_boost: float = 0.22 if near_ocean else 0.0
 		# Mountains cause a rain shadow on their upper slopes.
 		var mtn_shadow: float = max(0.0, alt - 0.55) * 0.65
-		var m_var: float = m_noise.get_noise_3dv(pos * p_noise_scale * 0.8) * 0.22
+		var m_var: float = m_noise.get_noise_3dv(pos * p_noise_scale * 0.8) * 0.28
 
 		var moisture: float = clamp(
 				base_m + ocean_boost - mtn_shadow + m_var, 0.0, 1.0)
@@ -497,8 +497,11 @@ static func _classify_biome(
 		return BIOME_TUNDRA
 
 	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
+	# Snow threshold 0.50: tropical mountains (lat < ~0.27) stay rocky grey;
+	# mid-latitude and polar mountains get snow once altitude cooling brings
+	# temperature below 0.50.
 	if alt > 0.45:
-		if near_ocean or temperature >= 0.32:
+		if near_ocean or temperature >= 0.50:
 			return BIOME_MOUNTAIN
 		return BIOME_SNOW
 
@@ -529,7 +532,7 @@ static func _classify_biome(
 		return BIOME_TROPICAL_RAINFOREST
 	if moisture > 0.32:
 		return BIOME_SAVANNA
-	if moisture > 0.14:
+	if moisture > 0.24:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
