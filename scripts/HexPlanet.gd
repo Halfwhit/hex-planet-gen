@@ -209,11 +209,11 @@ static func _classify_biome(
 		return BIOME_ICE if temperature < 0.25 else BIOME_SNOW
 
 	# Polar ice cap.
-	if temperature < 0.08:
+	if temperature < 0.05:
 		return BIOME_ICE
 
 	# Sub-polar tundra.
-	if temperature < 0.20:
+	if temperature < 0.13:
 		return BIOME_TUNDRA
 
 	# Rocky mountains at moderate altitude (below the snow line).
@@ -225,7 +225,8 @@ static func _classify_biome(
 		return BIOME_BOREAL_FOREST if moisture > 0.42 else BIOME_TUNDRA
 
 	# Coastal beach — warm, low-lying, ocean-adjacent.
-	var coastal: bool = near_ocean and alt < 0.10
+	# Tight altitude cap keeps beaches as a narrow strip right at the waterline.
+	var coastal: bool = near_ocean and alt < 0.04
 
 	# Temperate zone.
 	if temperature < 0.60:
