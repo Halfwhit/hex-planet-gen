@@ -139,6 +139,16 @@ func _process(delta: float) -> void:
 	if _locking:
 		orbit_camera.set_angles_from_dir(
 				(planet_mesh_instance.global_transform.basis * _lock_cell_local).normalized())
+	elif _current_lod == 3:
+		# At max LOD the camera tracks the spinning surface so tiles stay
+		# still on screen even without a tile selected.  The planet's polar
+		# axis (tilted Y column of its basis) is constant between frames, so
+		# we rotate the camera's current look-from direction by the same
+		# angular step the planet just turned.
+		orbit_camera.set_angles_from_dir(
+				orbit_camera.global_transform.basis.z.rotated(
+						planet_mesh_instance.global_transform.basis.y,
+						_rotation_speed_rad * delta))
 
 
 func _editor_generate() -> void:
