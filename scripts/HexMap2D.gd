@@ -244,6 +244,7 @@ func _map_title(type: int, temperature: float, moisture: float) -> String:
 		HexPlanet.BIOME_TROPICAL_OCEAN:      return "Tropical Ocean"
 		HexPlanet.BIOME_ICY_OCEAN:           return "Icy Ocean"
 		HexPlanet.BIOME_COASTAL_OCEAN:       return "Coastal Waters"
+		HexPlanet.BIOME_LAKE:                return "Lake"
 		HexPlanet.BIOME_BEACH:               return "Beach"
 		HexPlanet.BIOME_TROPICAL_RAINFOREST: return "Tropical Rainforest"
 		HexPlanet.BIOME_SAVANNA:             return "Savanna"

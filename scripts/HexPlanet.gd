@@ -31,6 +31,8 @@ const BIOME_SNOW: int = 15
 const BIOME_ICE: int = 16
 ## Shoreline ocean — very shallow band right at the waterline:
 const BIOME_COASTAL_OCEAN: int = 17
+## Landlocked water body (ocean region not connected to the main ocean):
+const BIOME_LAKE: int = 18
 
 ## Each element is a Dictionary with keys:
 ##   position, polygon, height, type, pentagon,
@@ -138,6 +140,43 @@ func generate(
 			"plate_oceanic": _plate_is_oceanic[_cell_plate[vi]],
 		})
 
+	# ── Lake detection ───────────────────────────────────────────────────────
+	# Flood-fill connected ocean regions.  The largest region is the main ocean;
+	# all smaller isolated regions (fully enclosed by land) are lakes.
+	var ocean_visited: Array[bool] = []
+	ocean_visited.resize(n_verts)
+	var ocean_components: Array[Array] = []
+
+	for vi: int in n_verts:
+		if ocean_visited[vi] or (cells[vi] as Dictionary)["type"] as int != OCEAN:
+			continue
+		var component: Array[int] = []
+		var queue: Array[int] = [vi]
+		ocean_visited[vi] = true
+		while not queue.is_empty():
+			var curr: int = queue.pop_front()
+			component.append(curr)
+			for fi: int in (vertex_to_faces[curr] as Array):
+				for vj: int in (ico.faces[fi] as Array):
+					if not ocean_visited[vj] and \
+							(cells[vj] as Dictionary)["type"] as int == OCEAN:
+						ocean_visited[vj] = true
+						queue.append(vj)
+		ocean_components.append(component)
+
+	var main_ocean_idx: int = 0
+	for i: int in ocean_components.size():
+		if (ocean_components[i] as Array).size() > \
+				(ocean_components[main_ocean_idx] as Array).size():
+			main_ocean_idx = i
+
+	var lake_set: Dictionary = {}
+	for i: int in ocean_components.size():
+		if i == main_ocean_idx:
+			continue
+		for vi: int in (ocean_components[i] as Array):
+			lake_set[vi] = true
+
 	# Pass 2 — climate and biome.
 	# All types are now known so we can check adjacency for near-ocean detection.
 	for vi: int in n_verts:
@@ -205,7 +244,7 @@ func generate(
 
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
-		cell["biome"] = biome
+		cell["biome"] = BIOME_LAKE if lake_set.has(vi) else biome
 
 
 ## Simulate plate tectonics and return per-vertex heights.
