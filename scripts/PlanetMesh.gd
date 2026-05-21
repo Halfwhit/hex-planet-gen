@@ -94,15 +94,15 @@ static func _biome_color(
 	match biome:
 		# ── Ocean ─────────────────────────────────────────────────────────
 		HexPlanet.BIOME_DEEP_OCEAN:
-			return Color(0.03, 0.08, 0.32).lerp(Color(0.08, 0.18, 0.48), 1.0 - od)
+			return Color(0.08, 0.12, 0.26).lerp(Color(0.12, 0.20, 0.40), 1.0 - od)
 		HexPlanet.BIOME_SHALLOW_OCEAN:
-			return Color(0.10, 0.30, 0.60).lerp(Color(0.20, 0.50, 0.76), 1.0 - od)
+			return Color(0.16, 0.32, 0.52).lerp(Color(0.26, 0.46, 0.64), 1.0 - od)
 		HexPlanet.BIOME_TROPICAL_OCEAN:
-			return Color(0.02, 0.42, 0.60).lerp(Color(0.08, 0.64, 0.78), 1.0 - od)
+			return Color(0.14, 0.40, 0.56).lerp(Color(0.22, 0.58, 0.70), 1.0 - od)
 		HexPlanet.BIOME_ICY_OCEAN:
-			return Color(0.50, 0.62, 0.72).lerp(Color(0.68, 0.80, 0.88), 1.0 - od)
+			return Color(0.52, 0.60, 0.68).lerp(Color(0.68, 0.76, 0.82), 1.0 - od)
 		HexPlanet.BIOME_COASTAL_OCEAN:
-			return Color(0.18, 0.58, 0.70).lerp(Color(0.28, 0.70, 0.82), 1.0 - od)
+			return Color(0.22, 0.50, 0.62).lerp(Color(0.32, 0.62, 0.72), 1.0 - od)
 		# ── Coastal ───────────────────────────────────────────────────────
 		HexPlanet.BIOME_BEACH:
 			return Color(0.78, 0.70, 0.46).lerp(Color(0.90, 0.82, 0.60), la)
