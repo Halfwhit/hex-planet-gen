@@ -69,13 +69,20 @@ func setup(
 	queue_redraw()
 
 
-## Returns the 6 ring-1 neighbour types and heights in HEX_DIRS / EDGE_SLOTS order.
-## Each element is a Dictionary {"type": int, "height": float}.
-## Call after setup() so _region is populated.  Used by HexMap2D to seed its border terrain.
+## Returns the 6 ring-1 neighbour data in HEX_DIRS / EDGE_SLOTS order.
+## Each element is a Dictionary {type, height, biome, temperature, moisture}.
+## Call after setup() so _region is populated.  Used by HexMap2D to seed
+## its border terrain with full climate information.
 func get_ring1_data() -> Array:
 	var result: Array = []
 	for i: int in 6:
-		result.append({"type": HexPlanet.OCEAN, "height": -0.5})  # safe ocean default
+		result.append({
+			"type": HexPlanet.OCEAN,
+			"height": -0.5,
+			"biome": HexPlanet.BIOME_SHALLOW_OCEAN,
+			"temperature": 0.5,
+			"moisture": 0.5,
+		})
 	for entry: Dictionary in _region:
 		var q: int = entry["q"] as int
 		var r: int = entry["r"] as int
@@ -84,7 +91,13 @@ func get_ring1_data() -> Array:
 		var coord: Vector2i = Vector2i(q, r)
 		for i: int in HEX_DIRS.size():
 			if (HEX_DIRS[i] as Vector2i) == coord:
-				result[i] = {"type": entry["type"] as int, "height": entry["height"] as float}
+				result[i] = {
+					"type": entry["type"] as int,
+					"height": entry["height"] as float,
+					"biome": entry["biome"] as int,
+					"temperature": entry.get("temperature", 0.5) as float,
+					"moisture": entry.get("moisture", 0.5) as float,
+				}
 				break
 	return result
 
@@ -105,7 +118,8 @@ func _draw() -> void:
 				entry["height"] as float,
 				entry["type"] as int,
 				_land_threshold,
-				debug_pentagons and entry["pentagon"] as bool))
+				debug_pentagons and entry["pentagon"] as bool,
+				entry["biome"] as int))
 
 		if entry["is_occupied"] as bool:
 			draw_colored_polygon(corners, occupied_tint)
@@ -241,6 +255,7 @@ func _build_region(
 			"is_center": idx == center_idx,
 			"is_occupied": occupied.has(idx),
 			"pentagon": cell["pentagon"] as bool,
+			"biome": cell.get("biome", -1) as int,
 		})
 
 	# --- Gap filling ---
@@ -310,6 +325,7 @@ func _build_region(
 				"is_center": false,
 				"is_occupied": false,
 				"pentagon": best_cell["pentagon"] as bool,
+				"biome": best_cell.get("biome", -1) as int,
 			})
 
 	return region
@@ -336,21 +352,35 @@ func _hex_corners(center: Vector2) -> PackedVector2Array:
 
 
 func _cell_description(cell: Dictionary) -> String:
+	var biome: int = cell.get("biome", -1) as int
+	match biome:
+		HexPlanet.BIOME_DEEP_OCEAN:          return "Deep Ocean"
+		HexPlanet.BIOME_SHALLOW_OCEAN:       return "Shallow Ocean"
+		HexPlanet.BIOME_TROPICAL_OCEAN:      return "Tropical Ocean"
+		HexPlanet.BIOME_ICY_OCEAN:           return "Icy Ocean"
+		HexPlanet.BIOME_BEACH:               return "Beach"
+		HexPlanet.BIOME_TROPICAL_RAINFOREST: return "Tropical Rainforest"
+		HexPlanet.BIOME_SAVANNA:             return "Savanna"
+		HexPlanet.BIOME_DESERT:              return "Desert"
+		HexPlanet.BIOME_GRASSLAND:           return "Grassland"
+		HexPlanet.BIOME_SHRUBLAND:           return "Shrubland"
+		HexPlanet.BIOME_TEMPERATE_FOREST:    return "Temperate Forest"
+		HexPlanet.BIOME_TEMPERATE_RAINFOREST:return "Temperate Rainforest"
+		HexPlanet.BIOME_BOREAL_FOREST:       return "Boreal Forest"
+		HexPlanet.BIOME_TUNDRA:              return "Tundra"
+		HexPlanet.BIOME_MOUNTAIN:            return "Mountain"
+		HexPlanet.BIOME_SNOW:                return "Snow"
+		HexPlanet.BIOME_ICE:                 return "Ice"
+	# Fallback for cells missing biome data (e.g. editor preview).
 	var is_ocean: bool = (cell["type"] as int) == 0
 	var h: float = cell["height"] as float
 	if is_ocean:
 		return "Ocean — %s" % ("deep" if h < -0.3 else "shallow")
 	var t: float = clamp((h - _land_threshold) / max(1.0 - _land_threshold, 0.001), 0.0, 1.0)
-	var label: String
-	if t < 0.15:
-		label = "coast"
-	elif t < 0.4:
-		label = "lowland"
-	elif t < 0.7:
-		label = "highland"
-	else:
-		label = "mountain"
-	return "Land — %s" % label
+	if t < 0.15: return "Land — coast"
+	elif t < 0.4: return "Land — lowland"
+	elif t < 0.7: return "Land — highland"
+	return "Land — mountain"
 
 
 # Returns all six direction indices sorted from best to worst match for (dx, dy).

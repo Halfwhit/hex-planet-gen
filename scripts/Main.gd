@@ -316,6 +316,8 @@ func _show_local_map(idx: int) -> void:
 	_hex_map_2d.call("setup",
 		cell["type"] as int,
 		cell["height"] as float,
+		cell.get("temperature", 0.5) as float,
+		cell.get("moisture", 0.5) as float,
 		_land_threshold,
 		_local_map.get_ring1_data(),
 		noise_seed + idx,

@@ -51,20 +51,25 @@ func _ready() -> void:
 
 ## Build and display the 2D map.
 ## center_type / center_height: planet cell terrain for the occupied tile.
+## center_temperature / center_moisture: climate values from HexPlanet (0–1).
 ## land_threshold: sea-level height value (same as planet).
-## border_data: Array[Dictionary] of 6 entries {"type": int, "height": float},
-##   one per EDGE_SLOTS direction, from LocalMap.get_ring1_data().
+## border_data: Array of 6 Dicts {type, height, biome, temperature, moisture}
+##   in EDGE_SLOTS order, from LocalMap.get_ring1_data().
 ## noise_seed: deterministic seed; pass planet noise_seed + cell_index.
 func setup(
 		center_type: int,
 		center_height: float,
+		center_temperature: float,
+		center_moisture: float,
 		land_threshold: float,
 		border_data: Array,
 		noise_seed: int,
 ) -> void:
 	_land_threshold = land_threshold
-	_tiles = _generate_tiles(center_type, center_height, border_data, noise_seed)
-	_title_label.text = _map_title(center_type, center_height)
+	_tiles = _generate_tiles(
+			center_type, center_height, center_temperature, center_moisture,
+			border_data, noise_seed)
+	_title_label.text = _map_title(center_type, center_temperature, center_moisture)
 	queue_redraw()
 
 
@@ -87,27 +92,33 @@ func _draw() -> void:
 
 ## Generate tile data for every cell in the hex grid.
 ##
-## Terrain is blended from the center outward using two forces:
-##   1. Radial factor t  (0 at center, 1 at outer ring) determines how much the
-##      border types dominate.
-##   2. Angular weights  distribute border influence across the 6 directions - a
-##      tile pointing toward a water border gets more water influence than one
-##      pointing toward a land border.
-## Noise is added on top to make boundaries organic rather than perfectly circular.
+## Each tile's climate is computed by blending the center cell's temperature
+## and moisture outward toward the 6 border directions, weighted by angular
+## alignment.  Biome is then classified from the blended climate values using
+## the same HexPlanet._classify_biome() logic as the planet surface, so the
+## 2D map stays consistent with what is displayed in the LocalMap minimap.
 func _generate_tiles(
 		center_type: int,
 		center_height: float,
+		center_temperature: float,
+		center_moisture: float,
 		border_data: Array,
 		noise_seed: int,
 ) -> Array:
-	# Type noise determines ocean/land boundary variation.
-	var tnoise: FastNoiseLite = FastNoiseLite.new()
-	tnoise.seed = noise_seed
-	tnoise.frequency = 0.45
-	tnoise.fractal_octaves = 3
-	tnoise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	# Ocean / land boundary noise.
+	var onoise: FastNoiseLite = FastNoiseLite.new()
+	onoise.seed = noise_seed
+	onoise.frequency = 0.45
+	onoise.fractal_octaves = 3
+	onoise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 
-	# Height noise adds texture within each terrain band.
+	# Climate noise — perturbs temperature and moisture for organic variation.
+	var cnoise: FastNoiseLite = FastNoiseLite.new()
+	cnoise.seed = noise_seed ^ 0x1A2B3C
+	cnoise.frequency = 0.38
+	cnoise.fractal_octaves = 2
+
+	# Fine height noise for micro-terrain texture.
 	var hnoise: FastNoiseLite = FastNoiseLite.new()
 	hnoise.seed = noise_seed + 9973
 	hnoise.frequency = 0.8
@@ -122,14 +133,16 @@ func _generate_tiles(
 			if dist > MAP_RADIUS:
 				continue
 
-			# Radial blend factor: 0 at center, 1 at outermost ring.
+			# Radial blend: 0 at center, 1 at outer ring.
 			var t: float = float(dist) / float(MAP_RADIUS)
 
-			# Angular weights: how much each of the 6 border directions contributes
-			# to this tile based on directional alignment.
-			var border_ocean_sum: float = 0.0
-			var border_height_sum: float = 0.0
-			var weight_total: float = 0.0
+			# Angular weights — cosine similarity of each tile's pixel direction
+			# with each of the 6 border slot directions.
+			var w_ocean: float = 0.0
+			var w_temp: float = 0.0
+			var w_moist: float = 0.0
+			var w_height: float = 0.0
+			var w_total: float = 0.0
 
 			if dist > 0:
 				var px: float = -1.5 * float(q)
@@ -142,45 +155,53 @@ func _generate_tiles(
 					var dpx: float = -1.5 * float(dq)
 					var dpy: float = SQRT3 * (float(dr) + float(dq) * 0.5)
 					var slot_len: float = sqrt(dpx * dpx + dpy * dpy)
-
-					# Cosine similarity clamped to [0, 1] - only forward-facing borders matter.
-					var cos_sim: float = (px * dpx + py * dpy) / (tile_len * slot_len)
-					var weight: float = max(0.0, cos_sim)
+					var weight: float = max(0.0, (px * dpx + py * dpy) / (tile_len * slot_len))
 
 					var bd: Dictionary = border_data[i] as Dictionary
-					var b_ocean: float = 1.0 if (bd["type"] as int) == HexPlanet.OCEAN else 0.0
-					border_ocean_sum += weight * b_ocean
-					border_height_sum += weight * (bd["height"] as float)
-					weight_total += weight
+					w_ocean  += weight * (1.0 if (bd["type"] as int) == HexPlanet.OCEAN else 0.0)
+					w_temp   += weight * (bd.get("temperature", 0.5) as float)
+					w_moist  += weight * (bd.get("moisture", 0.5) as float)
+					w_height += weight * (bd["height"] as float)
+					w_total  += weight
 
-			var weighted_ocean: float = border_ocean_sum / max(weight_total, 0.001)
-			var weighted_height: float = border_height_sum / max(weight_total, 0.001) if dist > 0 else center_height
+			var inv_w: float = 1.0 / max(w_total, 0.001)
+			var b_ocean:  float = w_ocean  * inv_w if dist > 0 else center_ocean
+			var b_temp:   float = w_temp   * inv_w if dist > 0 else center_temperature
+			var b_moist:  float = w_moist  * inv_w if dist > 0 else center_moisture
+			var b_height: float = w_height * inv_w if dist > 0 else center_height
 
-			# Blend center vs borders radially, then perturb with noise.
-			var ocean_tendency: float = lerpf(center_ocean, weighted_ocean, t)
-			var nv: float = tnoise.get_noise_2d(float(q), float(r))
-			ocean_tendency = clamp(ocean_tendency + nv * 0.32, 0.0, 1.0)
+			# Blend center → border, then add noise.
+			var nv: float = onoise.get_noise_2d(float(q), float(r))
+			var cv: float = cnoise.get_noise_2d(float(q), float(r))
 
-			var tile_type: int = HexPlanet.OCEAN if ocean_tendency > 0.5 else HexPlanet.LAND
+			var ocean_t: float = clamp(lerpf(center_ocean,       b_ocean,  t) + nv * 0.30, 0.0, 1.0)
+			var eff_T:   float = clamp(lerpf(center_temperature, b_temp,   t) + cv * 0.05, 0.0, 1.0)
+			var eff_M:   float = clamp(lerpf(center_moisture,    b_moist,  t) + cv * 0.18, 0.0, 1.0)
 
-			# Blend height radially, add fine noise for texture.
-			var base_height: float = lerpf(center_height, weighted_height, t)
+			var tile_type: int = HexPlanet.OCEAN if ocean_t > 0.5 else HexPlanet.LAND
+
+			# Height: blend then add fine noise.
 			var hn: float = hnoise.get_noise_2d(float(q) * 1.5, float(r) * 1.5) * 0.07
-			var tile_height: float = clamp(base_height + hn, -1.0, 1.0)
-
-			# Clamp height into the valid range for the determined type so colour
-			# boundaries don't produce mismatched palette entries.
+			var tile_height: float = clamp(lerpf(center_height, b_height, t) + hn, -1.0, 1.0)
 			if tile_type == HexPlanet.OCEAN:
 				tile_height = min(tile_height, _land_threshold - 0.01)
 			else:
 				tile_height = max(tile_height, _land_threshold + 0.01)
+
+			# Near-ocean: a land tile strongly influenced by ocean borders counts
+			# as coastal for beach/grassland biome purposes.
+			var near_ocean: bool = (tile_type == HexPlanet.LAND and ocean_t > 0.28)
+
+			var tile_biome: int = HexPlanet._classify_biome(
+					tile_type, tile_height, eff_T, eff_M, near_ocean, _land_threshold)
 
 			tiles.append({
 				"q": q,
 				"r": r,
 				"type": tile_type,
 				"height": tile_height,
-				"color": PlanetMesh.terrain_color(tile_height, tile_type, _land_threshold),
+				"color": PlanetMesh.terrain_color(
+						tile_height, tile_type, _land_threshold, false, tile_biome),
 			})
 
 	return tiles
@@ -213,14 +234,26 @@ func _hex_corners(center: Vector2, hex_size: float) -> PackedVector2Array:
 	return pts
 
 
-func _map_title(type: int, height: float) -> String:
-	if type == HexPlanet.OCEAN:
-		return "Ocean - %s" % ("deep" if height < -0.3 else "shallow")
-	var t: float = clamp((height - _land_threshold) / max(1.0 - _land_threshold, 0.001), 0.0, 1.0)
-	if t < 0.15:
-		return "Coastal land"
-	elif t < 0.4:
-		return "Lowland"
-	elif t < 0.7:
-		return "Highland"
-	return "Mountain"
+func _map_title(type: int, temperature: float, moisture: float) -> String:
+	var biome: int = HexPlanet._classify_biome(
+			type, _land_threshold + (0.1 if type == HexPlanet.LAND else -0.1),
+			temperature, moisture, false, _land_threshold)
+	match biome:
+		HexPlanet.BIOME_DEEP_OCEAN:          return "Deep Ocean"
+		HexPlanet.BIOME_SHALLOW_OCEAN:       return "Shallow Ocean"
+		HexPlanet.BIOME_TROPICAL_OCEAN:      return "Tropical Ocean"
+		HexPlanet.BIOME_ICY_OCEAN:           return "Icy Ocean"
+		HexPlanet.BIOME_BEACH:               return "Beach"
+		HexPlanet.BIOME_TROPICAL_RAINFOREST: return "Tropical Rainforest"
+		HexPlanet.BIOME_SAVANNA:             return "Savanna"
+		HexPlanet.BIOME_DESERT:              return "Desert"
+		HexPlanet.BIOME_GRASSLAND:           return "Grassland"
+		HexPlanet.BIOME_SHRUBLAND:           return "Shrubland"
+		HexPlanet.BIOME_TEMPERATE_FOREST:    return "Temperate Forest"
+		HexPlanet.BIOME_TEMPERATE_RAINFOREST:return "Temperate Rainforest"
+		HexPlanet.BIOME_BOREAL_FOREST:       return "Boreal Forest"
+		HexPlanet.BIOME_TUNDRA:              return "Tundra"
+		HexPlanet.BIOME_MOUNTAIN:            return "Mountain"
+		HexPlanet.BIOME_SNOW:                return "Snow"
+		HexPlanet.BIOME_ICE:                 return "Ice"
+	return "Unknown Terrain"
