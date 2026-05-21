@@ -141,41 +141,41 @@ func generate(
 		})
 
 	# ── Lake detection ───────────────────────────────────────────────────────
-	# Flood-fill connected ocean regions.  The largest region is the main ocean;
-	# all smaller isolated regions (fully enclosed by land) are lakes.
-	var ocean_visited: Array[bool] = []
-	ocean_visited.resize(n_verts)
-	var ocean_components: Array[Array] = []
+	# Assign every ocean cell a component ID, track each component's size,
+	# then mark every non-largest component as a lake.
+	# No component-cell lists are stored — only one int per vertex.
+	var comp_id: Array[int] = []
+	comp_id.resize(n_verts)
+	for i: int in n_verts:
+		comp_id[i] = -1
+
+	var comp_sizes: Array[int] = []
+	var next_comp: int = 0
 
 	for vi: int in n_verts:
-		if ocean_visited[vi] or (cells[vi] as Dictionary)["type"] as int != OCEAN:
+		if comp_id[vi] >= 0 or (cells[vi] as Dictionary)["type"] as int != OCEAN:
 			continue
-		var component: Array[int] = []
 		var queue: Array[int] = [vi]
-		ocean_visited[vi] = true
+		comp_id[vi] = next_comp
+		var sz: int = 0
 		while not queue.is_empty():
 			var curr: int = queue.pop_back()
-			component.append(curr)
+			sz += 1
 			for fi: int in (vertex_to_faces[curr] as Array):
 				for vj: int in (ico.faces[fi] as Array):
-					if not ocean_visited[vj] and \
+					if comp_id[vj] == -1 and \
 							(cells[vj] as Dictionary)["type"] as int == OCEAN:
-						ocean_visited[vj] = true
+						comp_id[vj] = next_comp
 						queue.append(vj)
-		ocean_components.append(component)
+		comp_sizes.append(sz)
+		next_comp += 1
 
-	var main_ocean_idx: int = 0
-	for i: int in ocean_components.size():
-		if (ocean_components[i] as Array).size() > \
-				(ocean_components[main_ocean_idx] as Array).size():
-			main_ocean_idx = i
+	var main_comp: int = 0
+	for i: int in comp_sizes.size():
+		if comp_sizes[i] > comp_sizes[main_comp]:
+			main_comp = i
 
-	var lake_set: Dictionary = {}
-	for i: int in ocean_components.size():
-		if i == main_ocean_idx:
-			continue
-		for vi: int in (ocean_components[i] as Array):
-			lake_set[vi] = true
+	# comp_id is checked directly in pass 2 — no dictionary needed.
 
 	# Pass 2 — climate and biome.
 	# All types are now known so we can check adjacency for near-ocean detection.
@@ -244,7 +244,7 @@ func generate(
 
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
-		cell["biome"] = BIOME_LAKE if lake_set.has(vi) else biome
+		cell["biome"] = BIOME_LAKE if (comp_id[vi] >= 0 and comp_id[vi] != main_comp) else biome
 
 
 ## Simulate plate tectonics and return per-vertex heights.
