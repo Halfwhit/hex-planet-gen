@@ -89,6 +89,11 @@ func set_angles(pitch: float, yaw: float) -> void:
 
 
 func set_angles_from_dir(dir: Vector3) -> void:
+	# Treat external angle driving as "activity" so idle orbit never fights
+	# with a tile-locked camera.  Main._process runs before OrbitCamera._process,
+	# so resetting here keeps _idle_timer at ~delta rather than ever reaching
+	# idle_delay while a tile is selected.
+	_idle_timer = 0.0
 	set_angles(-asin(clamp(dir.y, -1.0, 1.0)), atan2(dir.x, dir.z))
 
 
