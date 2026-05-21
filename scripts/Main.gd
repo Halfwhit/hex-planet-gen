@@ -135,10 +135,10 @@ func _process(delta: float) -> void:
 	# so there is no floating-point drift and the spin axis provably matches the
 	# RotationAxis line.
 	_spin_angle += _rotation_speed_rad * delta
-	planet_mesh_instance.basis = _tilt_basis * Basis(Vector3.UP, _spin_angle)
+	var _planet_basis: Basis = _tilt_basis * Basis(Vector3.UP, _spin_angle)
+	planet_mesh_instance.basis = _planet_basis
 	if _locking:
-		orbit_camera.set_angles_from_dir(
-				(planet_mesh_instance.global_transform.basis * _lock_cell_local).normalized())
+		orbit_camera.set_angles_from_dir((_planet_basis * _lock_cell_local).normalized())
 
 
 func _editor_generate() -> void:
