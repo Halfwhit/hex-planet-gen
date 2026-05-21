@@ -190,6 +190,11 @@ func generate(
 		if comp_sizes[i] > comp_sizes[main_comp]:
 			main_comp = i
 
+	# Any disconnected ocean body smaller than this stays a lake.
+	# Bodies at or above this size are large enough to classify as sea/ocean
+	# and keep their regular ocean biomes.  2.5 % of total cells scales
+	# naturally across LOD levels (≈256 cells at LOD 3, ≈64 at LOD 2).
+	var lake_size_limit: int = max(1, n_verts / 40)
 
 	# comp_id is checked directly in pass 2 — no dictionary needed.
 
@@ -260,7 +265,8 @@ func generate(
 
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
-		cell["biome"] = BIOME_LAKE if (comp_id[vi] >= 0 and comp_id[vi] != main_comp) else biome
+		var isolated: bool = comp_id[vi] >= 0 and comp_id[vi] != main_comp
+		cell["biome"] = BIOME_LAKE if (isolated and comp_sizes[comp_id[vi]] <= lake_size_limit) else biome
 
 
 
