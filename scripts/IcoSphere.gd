@@ -22,8 +22,14 @@ func generate(subdivisions: int) -> void:
 		Vector3( PHI,  0.0, -1.0), Vector3( PHI,  0.0,  1.0),
 		Vector3(-PHI,  0.0, -1.0), Vector3(-PHI,  0.0,  1.0),
 	]
+	# Rotate the icosahedron so that vertex 1 (1, φ, 0) aligns with (0, 1, 0) and
+	# its antipode (vertex 2) aligns with (0, -1, 0).  This places one pentagon
+	# cell at each geographic pole (local ±Y), making the axial tilt visually
+	# apparent: the poles sit at the blue RotationAxis line, not the amber TrueNorthAxis.
+	# The alignment angle is atan(1/φ) ≈ 31.7°, derived from the icosahedron geometry.
+	var align: Basis = Basis.from_euler(Vector3(0.0, 0.0, atan(1.0 / PHI)))
 	for v: Vector3 in raw:
-		vertices.append(v.normalized())
+		vertices.append((align * v).normalized())
 
 	faces = [
 		[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],

@@ -58,6 +58,9 @@ func generate(
 			"polygon": polygon,
 			"height": h,
 			"type": terrain_type,
+			# Exactly 12 cells on any Goldberg polyhedron are pentagons (5 sides).
+			# Flag them so renderers can treat them as landmarks.
+			"pentagon": polygon.size() == 5,
 		})
 
 
