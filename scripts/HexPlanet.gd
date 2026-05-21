@@ -374,10 +374,15 @@ func _build_tectonic_heights(
 				var conv: float = (my_drift - plate_drifts[nb_p]).dot(toward)
 				var eff: float
 				if conv > 0.0:
-					if not my_oceanic:
+					if not my_oceanic and not nb_oceanic:
+						# Continental-continental collision — Himalaya / Alps style.
+						# Extra multiplier (1.5×) produces the tallest ranges.
+						eff = conv * p_mountain_height * 1.5
+					elif not my_oceanic:
+						# Continental overriding oceanic — Andes / Cascades style.
 						eff = conv * p_mountain_height
 					elif not nb_oceanic:
-						eff = -conv * 0.45  # subduction trench
+						eff = -conv * 0.45  # subduction trench (oceanic side)
 					else:
 						eff = conv * 0.18   # oceanic-oceanic island arc
 				else:
@@ -407,8 +412,10 @@ func _build_tectonic_heights(
 	# Bellman-Ford style: each pass lets the strongest reachable effect win
 	# from any direction, so mountain ranges extend naturally on both sides of
 	# a collision zone with no single-direction blocking artefacts.
-	const DECAY: float = 0.72
-	const MAX_HOPS: int = 12
+	# DECAY 0.86 gives a ~7-cell-wide mountain band from a continental collision
+	# (vs. ~2 cells with the old 0.72), which reads as a proper range.
+	const DECAY: float = 0.86
+	const MAX_HOPS: int = 22
 
 	var propagated: Array[float] = boundary_effect.duplicate()
 	for _hop: int in MAX_HOPS:
@@ -488,7 +495,9 @@ static func _classify_biome(
 		return BIOME_TUNDRA
 
 	# Rocky mountains at moderate altitude (below the snow line).
-	if alt > 0.58 and temperature < 0.58 and not near_ocean:
+	# Temperature is not gated here — altitude alone determines mountain biome
+	# so tropical ranges (Andes, Himalayas) are classified correctly.
+	if alt > 0.58 and not near_ocean:
 		return BIOME_SNOW if temperature < 0.32 else BIOME_MOUNTAIN
 
 	# Boreal / taiga zone.
