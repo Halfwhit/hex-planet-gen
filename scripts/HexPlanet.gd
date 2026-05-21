@@ -359,6 +359,10 @@ func _build_tectonic_heights(
 		var any_change: bool = false
 		for vi: int in n_verts:
 			for vj: int in (adj[vi] as Array):
+				# Never propagate across a plate boundary — each plate's
+				# tectonic effect should only spread within its own territory.
+				if cell_plate[vj] != cell_plate[vi]:
+					continue
 				var candidate: float = propagated[vj] * DECAY
 				if abs(candidate) > abs(propagated[vi]) + 0.002:
 					propagated[vi] = candidate
