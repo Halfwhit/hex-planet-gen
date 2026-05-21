@@ -481,9 +481,7 @@ static func _classify_biome(
 			(height - land_threshold) / max(1.0 - land_threshold, 0.001), 0.0, 1.0)
 
 	# Very high alpine — always ice or snow regardless of latitude.
-	# Excluded when near ocean: coastal cliffs can have high alt values from
-	# tectonic generation but should not produce snow at the waterline.
-	if alt > 0.82 and not near_ocean:
+	if alt > 0.82:
 		return BIOME_ICE if temperature < 0.25 else BIOME_SNOW
 
 	# Polar ice cap.
@@ -495,11 +493,10 @@ static func _classify_biome(
 		return BIOME_TUNDRA
 
 	# Rocky mountains at moderate altitude (below the snow line).
-	# Temperature is not gated here — altitude alone determines mountain biome
-	# so tropical ranges (Andes, Himalayas) are classified correctly.
-	# Threshold at 0.45 (was 0.58) so that C-O collision ranges (Andes style)
-	# are wide enough to be clearly visible.
-	if alt > 0.45 and not near_ocean:
+	# No near_ocean gate — coastal ranges like the Andes and Cascades rise
+	# straight from the sea.  Beach is gated on alt < 0.02 separately so
+	# there is no overlap.
+	if alt > 0.45:
 		return BIOME_SNOW if temperature < 0.32 else BIOME_MOUNTAIN
 
 	# Boreal / taiga zone.
