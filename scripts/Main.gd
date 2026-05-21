@@ -139,16 +139,6 @@ func _process(delta: float) -> void:
 	if _locking:
 		orbit_camera.set_angles_from_dir(
 				(planet_mesh_instance.global_transform.basis * _lock_cell_local).normalized())
-	elif _current_lod == 3:
-		# At max LOD the camera tracks the spinning surface so tiles stay
-		# still on screen even without a tile selected.  The planet's polar
-		# axis (tilted Y column of its basis) is constant between frames, so
-		# we rotate the camera's current look-from direction by the same
-		# angular step the planet just turned.
-		orbit_camera.set_angles_from_dir(
-				orbit_camera.global_transform.basis.z.rotated(
-						planet_mesh_instance.global_transform.basis.y,
-						_rotation_speed_rad * delta))
 
 
 func _editor_generate() -> void:
@@ -206,7 +196,10 @@ func _set_lod(lod: int) -> void:
 	planet_mesh_instance.mesh = _lod_meshes[_current_lod]
 	var cells: Array = _lod_cells[_current_lod] if _current_lod == 3 else []
 	planet_gridmap.setup(orbit_camera.camera, planet_mesh_instance, cells, planet_radius)
-	_locking = false
+	# Do NOT clear _locking here — _lock_cell_local is a unit vector on the
+	# sphere, valid at any LOD.  Keeping the lock alive means a selected tile
+	# stays centred when the user zooms in/out.  The lock is still cleared by
+	# drag_started (user orbits) and by an explicit off-planet click.
 	if _local_map != null:
 		_local_map.hide()
 	if _hex_map_2d != null:
