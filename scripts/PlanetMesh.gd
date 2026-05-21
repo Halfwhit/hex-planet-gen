@@ -2,7 +2,7 @@ class_name PlanetMesh
 extends RefCounted
 
 
-static func build(planet: HexPlanet, radius: float) -> ArrayMesh:
+static func build(planet: HexPlanet, radius: float, highlight_pentagons: bool = false) -> ArrayMesh:
 	var st: SurfaceTool = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
@@ -12,7 +12,12 @@ static func build(planet: HexPlanet, radius: float) -> ArrayMesh:
 		var cell_normal: Vector3 = cell["position"] as Vector3
 		var poly: PackedVector3Array = cell["polygon"] as PackedVector3Array
 		var n: int = poly.size()
-		var color: Color = _terrain_color(cell, planet.land_threshold)
+		var color: Color = terrain_color(
+			cell["height"] as float,
+			cell["type"] as int,
+			planet.land_threshold,
+			highlight_pentagons and cell["pentagon"] as bool,
+		)
 
 		st.set_normal(cell_normal)
 		st.set_color(color)
@@ -32,13 +37,23 @@ static func build(planet: HexPlanet, radius: float) -> ArrayMesh:
 	return mesh
 
 
-static func _terrain_color(cell: Dictionary, land_threshold: float) -> Color:
-	var h: float = cell["height"] as float
-	if (cell["type"] as int) == HexPlanet.OCEAN:
-		var t: float = clamp((h + 1.0) / (land_threshold + 1.0), 0.0, 1.0)
+## Returns the terrain colour for a cell given its raw parameters.
+## Pass highlight_pentagon = true to render the cell in the landmark magenta
+## (used for the 12 pentagon tiles when the debug toggle is on).
+static func terrain_color(
+		height: float,
+		type: int,
+		land_threshold: float,
+		highlight_pentagon: bool = false,
+) -> Color:
+	if highlight_pentagon:
+		return Color(0.85, 0.20, 0.55)  # vivid magenta — marks the 12 pentagon landmarks
+
+	if type == HexPlanet.OCEAN:
+		var t: float = clamp((height + 1.0) / (land_threshold + 1.0), 0.0, 1.0)
 		return Color(0.04, 0.12, 0.42).lerp(Color(0.18, 0.48, 0.72), t)
 
-	var t: float = clamp((h - land_threshold) / (1.0 - land_threshold), 0.0, 1.0)
+	var t: float = clamp((height - land_threshold) / max(1.0 - land_threshold, 0.001), 0.0, 1.0)
 	if t < 0.5:
 		return Color(0.08, 0.32, 0.08).lerp(Color(0.36, 0.58, 0.18), t / 0.5)
 	elif t < 0.8:
