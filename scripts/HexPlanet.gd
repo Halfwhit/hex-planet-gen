@@ -237,9 +237,9 @@ func generate(
 		# mid-latitude moderate → polar dry.
 		var base_m: float
 		if lat < 0.15:
-			base_m = 0.60
+			base_m = 0.50
 		elif lat < 0.35:
-			base_m = lerpf(0.60, 0.20, (lat - 0.15) / 0.20)
+			base_m = lerpf(0.50, 0.20, (lat - 0.15) / 0.20)
 		elif lat < 0.60:
 			base_m = lerpf(0.20, 0.50, (lat - 0.35) / 0.25)
 		else:
@@ -412,9 +412,10 @@ func _build_tectonic_heights(
 	# Bellman-Ford style: each pass lets the strongest reachable effect win
 	# from any direction, so mountain ranges extend naturally on both sides of
 	# a collision zone with no single-direction blocking artefacts.
-	# DECAY 0.86 gives a ~7-cell-wide mountain band from a continental collision
-	# (vs. ~2 cells with the old 0.72), which reads as a proper range.
-	const DECAY: float = 0.86
+	# DECAY 0.82 gives ~4-6 cells of mountain from a typical collision,
+	# scaling up to ~7 for very high convergence.  Higher values (0.86+)
+	# produced bands 10+ cells wide on strong-convergence seeds.
+	const DECAY: float = 0.82
 	const MAX_HOPS: int = 22
 
 	var propagated: Array[float] = boundary_effect.duplicate()
