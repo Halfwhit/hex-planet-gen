@@ -39,6 +39,16 @@ const _HEX_MAP_2D_SCRIPT: GDScript = preload("res://scripts/HexMap2D.gd")
 ## occupied cells — both are kept in sync from this single value.
 @export_range(1, 5) var map_rings: int = 1
 
+@export_group("Tectonics")
+## Number of tectonic plates to generate.
+@export_range(4, 32) var num_plates: int = 12
+## Fraction of plates that are oceanic (low-lying); the rest are continental.
+@export_range(0.0, 1.0) var oceanic_plate_fraction: float = 0.65
+## Height multiplier for continental collision mountains (higher = taller ranges).
+@export var mountain_height: float = 0.85
+## Strength of the detail noise blended on top of the tectonic base (0 = perfectly smooth plates).
+@export_range(0.0, 0.5) var detail_noise_strength: float = 0.15
+
 @export_group("Editor Preview")
 @export_tool_button("Generate Planet", "MeshInstance3D")
 var _gen_btn: Callable = _editor_generate
@@ -134,11 +144,11 @@ func _editor_generate() -> void:
 		return
 
 	var noise: FastNoiseLite = _make_noise()
-	var sea_level: float = _compute_sea_level(noise)
 	var ico: IcoSphere = IcoSphere.new()
 	ico.generate(editor_preview_subdivisions)
 	var planet: HexPlanet = HexPlanet.new()
-	planet.generate(ico, noise, sea_level, noise_scale)
+	planet.generate(ico, noise, noise_scale, ocean_fraction,
+			num_plates, oceanic_plate_fraction, mountain_height, detail_noise_strength)
 	planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons)
 
 	for child_name: String in ["HorizonMask", "Atmosphere", "RotationAxis", "TrueNorthAxis"]:
@@ -159,8 +169,6 @@ func _on_zoom_changed(dist: float) -> void:
 
 func _generate_planet() -> void:
 	var noise: FastNoiseLite = _make_noise()
-	var sea_level: float = _compute_sea_level(noise)
-	_land_threshold = sea_level
 
 	_lod_meshes.clear()
 	_lod_cells.clear()
@@ -168,9 +176,12 @@ func _generate_planet() -> void:
 		var ico: IcoSphere = IcoSphere.new()
 		ico.generate(sub)
 		var planet: HexPlanet = HexPlanet.new()
-		planet.generate(ico, noise, sea_level, noise_scale)
+		planet.generate(ico, noise, noise_scale, ocean_fraction,
+				num_plates, oceanic_plate_fraction, mountain_height, detail_noise_strength)
 		_lod_meshes.append(PlanetMesh.build(planet, planet_radius, debug_pentagons))
 		_lod_cells.append(planet.cells)
+		# Use the highest-LOD threshold for local-map rendering (most accurate).
+		_land_threshold = planet.land_threshold
 
 	_current_lod = -1  # force _set_lod(0) to apply unconditionally
 	_set_lod(0)
@@ -198,19 +209,6 @@ func _make_noise() -> FastNoiseLite:
 	n.frequency = 0.5
 	n.fractal_octaves = 4
 	return n
-
-
-# Sample the noise at subdivision-3 resolution and return the height at the
-# ocean_fraction percentile — guarantees the target ocean coverage regardless
-# of seed or scale.
-func _compute_sea_level(noise: FastNoiseLite) -> float:
-	var probe: IcoSphere = IcoSphere.new()
-	probe.generate(3)
-	var heights: Array[float] = []
-	for v: Vector3 in probe.vertices:
-		heights.append(noise.get_noise_3dv(v * noise_scale))
-	heights.sort()
-	return heights[clamp(int(heights.size() * ocean_fraction), 0, heights.size() - 1)]
 
 
 func _make_sphere_layer(

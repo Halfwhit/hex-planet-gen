@@ -43,10 +43,13 @@ var noise_scale: float = 1.0
 func generate(
 		ico: IcoSphere,
 		noise: FastNoiseLite,
-		p_land_threshold: float,
 		p_noise_scale: float,
+		p_ocean_fraction: float,
+		p_num_plates: int = 12,
+		p_oceanic_plate_fraction: float = 0.65,
+		p_mountain_height: float = 0.85,
+		p_detail_strength: float = 0.15,
 ) -> void:
-	land_threshold = p_land_threshold
 	noise_scale = p_noise_scale
 	cells = []
 
@@ -84,7 +87,20 @@ func generate(
 		vertex_to_faces[f[1]].append(fi)
 		vertex_to_faces[f[2]].append(fi)
 
-	# Pass 1 — height, type, polygon (same as before).
+	# Tectonic pass — simulate plate interactions to derive per-cell heights.
+	# Sea level is then computed from the actual height distribution so that
+	# ocean_fraction is honoured regardless of seed or plate configuration.
+	var tectonic_h: Array[float] = _build_tectonic_heights(
+			ico, vertex_to_faces,
+			noise, p_noise_scale,
+			p_num_plates, p_oceanic_plate_fraction,
+			p_mountain_height, p_detail_strength)
+
+	var sorted_h: Array[float] = tectonic_h.duplicate()
+	sorted_h.sort()
+	land_threshold = sorted_h[clamp(int(sorted_h.size() * p_ocean_fraction), 0, sorted_h.size() - 1)]
+
+	# Pass 1 — height, type, polygon.
 	for vi: int in n_verts:
 		var pos: Vector3 = ico.vertices[vi]
 		var adj: Array = vertex_to_faces[vi]
@@ -94,8 +110,8 @@ func generate(
 			pts.append(face_centroids[fi])
 
 		var polygon: PackedVector3Array = _sort_around(pos, pts)
-		var h: float = noise.get_noise_3dv(pos * p_noise_scale)
-		var terrain_type: int = LAND if h > p_land_threshold else OCEAN
+		var h: float = tectonic_h[vi]
+		var terrain_type: int = LAND if h > land_threshold else OCEAN
 
 		cells.append({
 			"position": pos,
@@ -126,7 +142,7 @@ func generate(
 		# Altitude above sea level, normalised 0–1 over the land range.
 		var alt: float = 0.0
 		if type == LAND:
-			alt = clamp((h - p_land_threshold) / max(1.0 - p_land_threshold, 0.001), 0.0, 1.0)
+			alt = clamp((h - land_threshold) / max(1.0 - land_threshold, 0.001), 0.0, 1.0)
 
 		# ── Temperature ──────────────────────────────────────────────────────
 		# Driven by latitude (equator warm, poles cold) and altitude cooling.
@@ -174,11 +190,184 @@ func generate(
 
 		# ── Biome classification ──────────────────────────────────────────────
 		var biome: int = _classify_biome(
-				type, h, temperature, moisture, near_ocean, p_land_threshold)
+				type, h, temperature, moisture, near_ocean, land_threshold)
 
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
 		cell["biome"] = biome
+
+
+## Simulate plate tectonics and return per-vertex heights.
+##
+## Algorithm:
+##   1. Scatter N plate seeds randomly on the sphere.
+##   2. Assign each vertex to its nearest seed (spherical Voronoi).
+##   3. Each plate gets a type (oceanic = low base, continental = high base)
+##      and a random drift vector (tangent to the sphere).
+##   4. At each plate boundary, compute the convergence of the two plates'
+##      drift vectors along the boundary normal:
+##        +conv → converging  (mountains / trenches)
+##        −conv → diverging   (mid-ocean ridges / rifts)
+##   5. Boundary effects are propagated inward via BFS with exponential decay
+##      so mountain ranges extend several cells from the collision zone.
+##   6. Detail noise is blended in for coastline roughness and interior texture.
+func _build_tectonic_heights(
+		ico: IcoSphere,
+		vertex_to_faces: Array[Array],
+		noise: FastNoiseLite,
+		p_noise_scale: float,
+		p_num_plates: int,
+		p_oceanic_plate_fraction: float,
+		p_mountain_height: float,
+		p_detail_strength: float,
+) -> Array[float]:
+	var n_verts: int = ico.vertices.size()
+	var n_faces: int = ico.faces.size()
+
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = noise.seed
+
+	# ── 1. Plate seeds, types, and drift vectors ─────────────────────────────
+	var plate_seeds: PackedVector3Array
+	var plate_is_oceanic: Array[bool] = []
+	var plate_drifts: Array[Vector3] = []
+
+	for _i: int in p_num_plates:
+		# Uniform random point on sphere via rejection sampling.
+		var s: Vector3 = Vector3.ZERO
+		while s.length_squared() < 0.01 or s.length_squared() > 1.0:
+			s = Vector3(rng.randf_range(-1.0, 1.0),
+					rng.randf_range(-1.0, 1.0),
+					rng.randf_range(-1.0, 1.0))
+		s = s.normalized()
+		plate_seeds.append(s)
+		plate_is_oceanic.append(rng.randf() < p_oceanic_plate_fraction)
+		# Random drift: rotate one tangent direction around the sphere normal.
+		var ref_v: Vector3 = Vector3.UP if abs(s.y) < 0.9 else Vector3.RIGHT
+		var tan0: Vector3 = s.cross(ref_v).normalized()
+		var tan1: Vector3 = s.cross(tan0)
+		var ang: float = rng.randf() * TAU
+		var spd: float = rng.randf_range(0.3, 1.0)
+		plate_drifts.append((tan0 * cos(ang) + tan1 * sin(ang)) * spd)
+
+	# ── 2. Assign every vertex to its nearest plate ──────────────────────────
+	var cell_plate: Array[int] = []
+	cell_plate.resize(n_verts)
+	for vi: int in n_verts:
+		var pos: Vector3 = ico.vertices[vi]
+		var best: float = -1.0
+		var bp: int = 0
+		for pi: int in p_num_plates:
+			var d: float = pos.dot(plate_seeds[pi])
+			if d > best:
+				best = d
+				bp = pi
+		cell_plate[vi] = bp
+
+	# ── 3. Boundary convergence ──────────────────────────────────────────────
+	# For each boundary vertex, compute the height delta from tectonic
+	# interaction with the neighbouring plate.
+	var boundary_effect: Array[float] = []
+	boundary_effect.resize(n_verts)
+	var is_boundary: Array[bool] = []
+	is_boundary.resize(n_verts)
+	for i: int in n_verts:
+		boundary_effect[i] = 0.0
+		is_boundary[i] = false
+
+	for vi: int in n_verts:
+		var my_p: int = cell_plate[vi]
+		var my_oceanic: bool = plate_is_oceanic[my_p]
+		var my_drift: Vector3 = plate_drifts[my_p]
+		var pos: Vector3 = ico.vertices[vi]
+
+		for fi: int in (vertex_to_faces[vi] as Array):
+			for vj: int in (ico.faces[fi] as Array):
+				if vj == vi:
+					continue
+				var nb_p: int = cell_plate[vj]
+				if nb_p == my_p:
+					continue
+				is_boundary[vi] = true
+				var nb_oceanic: bool = plate_is_oceanic[nb_p]
+				var toward: Vector3 = (ico.vertices[vj] - pos).normalized()
+				# Positive convergence = plates moving toward each other.
+				var conv: float = (my_drift - plate_drifts[nb_p]).dot(toward)
+				var eff: float
+				if conv > 0.0:
+					if not my_oceanic:
+						# Continental collision (or arc on continental side) → high mountains.
+						eff = conv * p_mountain_height
+					elif not nb_oceanic:
+						# Oceanic subducting under continental → deep trench.
+						eff = -conv * 0.45
+					else:
+						# Oceanic-oceanic subduction → shallow trench with minor island arc.
+						eff = conv * 0.18
+				else:
+					if my_oceanic:
+						# Diverging oceanic plates → mid-ocean ridge.
+						eff = abs(conv) * 0.20
+					else:
+						# Diverging continental plates → rift valley (slight depression).
+						eff = conv * 0.05
+				if abs(eff) > abs(boundary_effect[vi]):
+					boundary_effect[vi] = eff
+
+	# ── 4. BFS: propagate boundary effects into plate interiors ─────────────
+	# Pre-compute vertex adjacency from the face list.
+	var adj: Array[Array] = []
+	adj.resize(n_verts)
+	for i: int in n_verts:
+		adj[i] = []
+	for fi: int in n_faces:
+		var f: Array = ico.faces[fi]
+		for k: int in 3:
+			var a: int = f[k]
+			var b: int = f[(k + 1) % 3]
+			if not (adj[a] as Array).has(b):
+				(adj[a] as Array).append(b)
+			if not (adj[b] as Array).has(a):
+				(adj[b] as Array).append(a)
+
+	# Each BFS hop attenuates the effect; mountains taper smoothly inland.
+	const DECAY: float = 0.72
+	const MAX_HOPS: int = 12
+
+	var propagated: Array[float] = boundary_effect.duplicate()
+	var visited: Array[bool] = is_boundary.duplicate()
+	var frontier: Array[int] = []
+	for vi: int in n_verts:
+		if is_boundary[vi]:
+			frontier.append(vi)
+
+	for _hop: int in MAX_HOPS:
+		if frontier.is_empty():
+			break
+		var next_frontier: Array[int] = []
+		for vi: int in frontier:
+			var d: float = propagated[vi] * DECAY
+			if abs(d) < 0.005:
+				continue
+			for vj: int in (adj[vi] as Array):
+				if visited[vj]:
+					continue
+				visited[vj] = true
+				propagated[vj] = d
+				next_frontier.append(vj)
+		frontier = next_frontier
+
+	# ── 5. Final heights: plate base + tectonic contribution + detail noise ──
+	const OCEAN_BASE: float = -0.38
+	const LAND_BASE: float = 0.04
+
+	var heights: Array[float] = []
+	heights.resize(n_verts)
+	for vi: int in n_verts:
+		var base: float = OCEAN_BASE if plate_is_oceanic[cell_plate[vi]] else LAND_BASE
+		var detail: float = noise.get_noise_3dv(ico.vertices[vi] * p_noise_scale) * p_detail_strength
+		heights[vi] = clamp(base + propagated[vi] + detail, -1.0, 1.0)
+	return heights
 
 
 ## Classify a cell into one of the 17 BIOME_* constants.
