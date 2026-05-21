@@ -532,13 +532,15 @@ static func _classify_biome(
 		return BIOME_SHRUBLAND
 
 	# Hot zone.
+	# Thresholds matched to the moisture distribution (base 0.44 ± ~0.24):
+	#   rainforest ~13 %  savanna ~35 %  shrubland ~31 %  desert ~21 %
 	if coastal:
 		return BIOME_BEACH
 	if moisture > 0.62:
 		return BIOME_TROPICAL_RAINFOREST
-	if moisture > 0.32:
+	if moisture > 0.45:
 		return BIOME_SAVANNA
-	if moisture > 0.24:
+	if moisture > 0.30:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
