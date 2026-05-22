@@ -21,7 +21,7 @@ const OUTLINE_WIDTH_FRACTION: float = 0.008
 
 var _camera: Camera3D = null
 var _planet_node: Node3D = null
-var _cells: Array[Dictionary] = []
+var _cells: Array = []
 var _cell_positions: PackedVector3Array = []
 var _neighbors: Array[Array] = []
 var _occupied: Dictionary = {}
