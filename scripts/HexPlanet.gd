@@ -497,7 +497,7 @@ static func _classify_biome(
 		return BIOME_ICE
 
 	# Sub-polar tundra.
-	if temperature < 0.05:
+	if temperature < 0.03:
 		return BIOME_TUNDRA
 
 	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
@@ -508,9 +508,10 @@ static func _classify_biome(
 			return BIOME_MOUNTAIN
 		return BIOME_SNOW
 
-	# Boreal / taiga zone.
+	# Boreal / taiga zone.  Moisture gate lowered to match the reduced base_m
+	# so dry cold cells become boreal forest rather than tundra.
 	if temperature < 0.38:
-		return BIOME_BOREAL_FOREST if moisture > 0.42 else BIOME_TUNDRA
+		return BIOME_BOREAL_FOREST if moisture > 0.22 else BIOME_TUNDRA
 
 	# Coastal beach — warm, low-lying, ocean-adjacent.
 	# alt < 0.01 keeps beach to only the very lowest coastal cells.
