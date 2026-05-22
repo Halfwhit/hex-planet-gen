@@ -146,10 +146,16 @@ func _generate_tiles(
 	onoise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 
 	# Climate noise — perturbs temperature and moisture for organic variation.
+	# Two independent noise instances so temperature and moisture vary independently.
 	var cnoise: FastNoiseLite = FastNoiseLite.new()
 	cnoise.seed = noise_seed ^ 0x1A2B3C
 	cnoise.frequency = 0.38
 	cnoise.fractal_octaves = 2
+
+	var mnoise: FastNoiseLite = FastNoiseLite.new()
+	mnoise.seed = noise_seed ^ 0x5F6A7B
+	mnoise.frequency = 0.38
+	mnoise.fractal_octaves = 2
 
 	# Fine height noise for micro-terrain texture.
 	var hnoise: FastNoiseLite = FastNoiseLite.new()
@@ -202,10 +208,11 @@ func _generate_tiles(
 			# Blend center → border, then add noise.
 			var nv: float = onoise.get_noise_2d(float(q), float(r))
 			var cv: float = cnoise.get_noise_2d(float(q), float(r))
+			var mv: float = mnoise.get_noise_2d(float(q), float(r))
 
 			var ocean_t: float = clamp(lerpf(center_ocean,       b_ocean,  t) + nv * 0.30, 0.0, 1.0)
 			var eff_T:   float = clamp(lerpf(center_temperature, b_temp,   t) + cv * 0.05, 0.0, 1.0)
-			var eff_M:   float = clamp(lerpf(center_moisture,    b_moist,  t) + cv * 0.18, 0.0, 1.0)
+			var eff_M:   float = clamp(lerpf(center_moisture,    b_moist,  t) + mv * 0.08, 0.0, 1.0)
 
 			var tile_type: int = HexPlanet.OCEAN if ocean_t > 0.5 else HexPlanet.LAND
 
