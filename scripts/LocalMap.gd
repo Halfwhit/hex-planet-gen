@@ -178,7 +178,7 @@ func _build_region(
 	var claimed: Dictionary = {Vector2i(0, 0): true}
 
 	# --- Ring-1: greedy bipartite matching ---
-	var ring1_candidates: Array[int] = all_neighbors[center_idx].duplicate()
+	var ring1_candidates: Array = all_neighbors[center_idx].duplicate()
 	var ring1_slots: Array[Vector2i] = [
 		Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1),
 		Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1),
