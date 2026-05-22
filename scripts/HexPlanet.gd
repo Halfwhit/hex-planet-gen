@@ -493,11 +493,11 @@ static func _classify_biome(
 		return BIOME_ICE if temperature < 0.25 else BIOME_SNOW
 
 	# Polar ice cap.
-	if temperature < 0.03:
+	if temperature < 0.015:
 		return BIOME_ICE
 
 	# Sub-polar tundra.
-	if temperature < 0.08:
+	if temperature < 0.05:
 		return BIOME_TUNDRA
 
 	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
