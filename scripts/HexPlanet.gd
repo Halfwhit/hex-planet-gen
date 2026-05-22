@@ -523,7 +523,7 @@ static func _classify_biome(
 			return BIOME_BEACH
 		if moisture > 0.72:
 			return BIOME_TEMPERATE_RAINFOREST
-		if moisture > 0.45:
+		if moisture > 0.38:
 			return BIOME_TEMPERATE_FOREST
 		if moisture > 0.22:
 			return BIOME_GRASSLAND
