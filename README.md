@@ -1,6 +1,6 @@
 # Hex Planet Generator
 
-A procedural planet generator built in Godot 4. Planets are tiled with a hexagonal grid (Goldberg polyhedra) and rendered with noise-driven terrain, an atmospheric glow, and a smooth horizon fade.
+A procedural planet generator built in Godot 4. Planets are tiled with a hexagonal grid (Goldberg polyhedra), shaped by a tectonic plate simulation, and coloured with a 19-biome climate system. Rendered with an atmospheric glow and a smooth horizon fade.
 
 ## Requirements
 
@@ -19,26 +19,70 @@ Open `project.godot` in Godot 4 and press **Play** (F5).
 | Hover over tile (LOD 3 only) | White outline highlights the tile |
 | Click tile (LOD 3 only) | Blue outline selects the tile; camera locks on and tracks it as the planet rotates |
 | Left-drag (while locked) | Unlocks camera and resumes free orbit |
+| **E** on selected tile | Occupy the tile; opens the local-map and 2D minimap panels |
 
 ## Inspector properties
 
 All properties are live on the **Main** node.
 
+### Planet
+
 | Property | Description |
 |----------|-------------|
 | `planet_radius` | Radius of the sphere in world units |
-| `ocean_fraction` | Target fraction of the surface covered by ocean (0–1). Sea level is computed adaptively from the noise distribution so this stays accurate across seeds. |
-| `noise_scale` | Spatial scale of the noise sampling |
-| `noise_seed` | RNG seed — change to get a different planet shape |
+| `ocean_fraction` | Target fraction of the surface covered by ocean (0–1). Sea level is the `ocean_fraction` percentile of the tectonic height distribution. |
+| `noise_scale` | Spatial scale of the detail noise layer |
+| `noise_seed` | RNG seed — change to get a different planet |
+
+### Tectonics
+
+| Property | Description |
+|----------|-------------|
+| `num_plates` | Number of tectonic plates (4–32) |
+| `oceanic_plate_fraction` | Fraction of plates that are oceanic (low-lying). The rest are continental. |
+| `mountain_height` | Elevation multiplier for continental collision zones |
+| `detail_noise_strength` | Strength of the fine noise blended on top of tectonic heights |
+
+### Atmosphere
+
+| Property | Description |
+|----------|-------------|
 | `atmosphere_color` | Colour of the rim glow |
 | `atmosphere_power` | Controls how tight the glow ring is |
-| `horizon_mask_color` | Should match the scene background colour so the polygon edges at the silhouette dissolve into it |
+| `horizon_mask_color` | Should match the scene background so polygon edges at the silhouette dissolve into it |
+
+### Rotation
+
+| Property | Description |
+|----------|-------------|
 | `rotation_speed` | Degrees per second of axial spin |
 | `axial_tilt` | Degrees the rotation axis is tilted from vertical |
 
 ### Editor preview
 
-With the scene open, select **Main** in the scene tree and click **Generate Planet** in the Inspector to preview the planet without running the game. The `editor_preview_subdivisions` property controls the LOD level used for this preview (default 3 = 642 cells, faster than the full LOD 5).
+With the scene open, select **Main** in the scene tree and click **Generate Planet** in the Inspector to preview without running the game. `editor_preview_subdivisions` sets the LOD level used (default 3 = 642 cells). Enable `debug_plates` to colour each tectonic plate instead of biomes.
+
+## Terrain generation
+
+Each planet is generated in three stages:
+
+1. **Tectonic simulation** — N plates are seeded with random positions, types (oceanic/continental), and drift vectors. Plate boundaries are domain-warped to avoid straight arcs. Convergent boundaries build mountains; divergent boundaries form rifts and mid-ocean ridges. A Bellman-Ford relaxation propagates these effects inland.
+
+2. **Sea level** — The `ocean_fraction` percentile of all cell heights is used as `land_threshold`. This guarantees the target ocean/land ratio regardless of seed or plate configuration.
+
+3. **Climate and biomes** — Temperature is driven by latitude and altitude. Moisture follows a Hadley-circulation curve (equatorial wet → subtropical dry → mid-latitude moderate → polar dry), perturbed by noise and a small coastal boost. Each cell is classified into one of 19 biomes.
+
+## Biomes
+
+| Zone | Biomes |
+|------|--------|
+| Ocean | Deep ocean, Shallow ocean, Tropical ocean, Icy ocean, Coastal ocean, Lake |
+| Hot (temp > 0.60) | Beach, Tropical rainforest, Savanna, Shrubland, Desert |
+| Temperate | Beach, Grassland, Shrubland, Temperate forest, Temperate rainforest |
+| Cold | Boreal forest, Tundra |
+| Alpine | Mountain, Snow, Ice |
+
+Lakes are disconnected ocean regions smaller than 2.5 % of the planet surface.
 
 ## Level of detail
 
@@ -51,13 +95,4 @@ Four LOD levels are generated at startup. The active level switches automaticall
 | 2 | 4 | 2 562 | > 4.0 |
 | 3 | 5 | 10 242 | ≤ 4.0 |
 
-Selecting a tile resets when the LOD switches, as cell indices do not correspond across resolutions.
-
-At LOD 3 the camera rotates with the planet automatically, as if standing on the surface. Dragging still orbits freely; the planet-relative position is maintained once dragging stops.
-
-## Planned steps
-
-- **Step 2** — Tectonic plates and realistic continental shapes
-- **Step 3** — Biome simulation (temperature, precipitation)
-- **Step 4** — River and erosion simulation
-- **Step 5** — Vegetation and natural resources
+Cell picking, hover/select outlines, and tile occupation are only active at LOD 3.
