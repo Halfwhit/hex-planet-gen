@@ -61,7 +61,7 @@ var _gen_btn: Callable = _editor_generate
 
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
-var _lod_cells: Array = []
+var _lod_cells: Array[Array] = []
 var _spin_angle: float = 0.0
 var _land_threshold: float = 0.0
 var _rotation_speed_rad: float = 0.0
@@ -194,7 +194,7 @@ func _set_lod(lod: int) -> void:
 		return
 	_current_lod = lod
 	planet_mesh_instance.mesh = _lod_meshes[_current_lod]
-	var cells: Array = _lod_cells[_current_lod] if _current_lod == 3 else []
+	var cells: Array[Dictionary] = _lod_cells[_current_lod] if _current_lod == 3 else []
 	planet_gridmap.setup(orbit_camera.camera, planet_mesh_instance, cells, planet_radius)
 	# Do NOT clear _locking here — _lock_cell_local is a unit vector on the
 	# sphere, valid at any LOD.  Keeping the lock alive means a selected tile
@@ -205,7 +205,7 @@ func _set_lod(lod: int) -> void:
 	if _hex_map_2d != null:
 		_hex_map_2d.hide()
 	if lod_label:
-		lod_label.text = "LOD %d  (%d cells)" % [lod, (_lod_cells[_current_lod] as Array).size()]
+		lod_label.text = "LOD %d  (%d cells)" % [lod, _lod_cells[_current_lod].size()]
 
 
 func _make_noise() -> FastNoiseLite:
@@ -315,7 +315,7 @@ func _show_local_map(idx: int) -> void:
 	)
 	_local_map.show()
 
-	var cell: Dictionary = _lod_cells[_current_lod][idx] as Dictionary
+	var cell: Dictionary = _lod_cells[_current_lod][idx]
 	_hex_map_2d.call("setup",
 		cell["type"] as int,
 		cell["height"] as float,
@@ -333,7 +333,7 @@ func _on_cell_selected(idx: int) -> void:
 		_locking = false
 		_local_map.hide()
 		return
-	var cell: Dictionary = _lod_cells[_current_lod][idx] as Dictionary
+	var cell: Dictionary = _lod_cells[_current_lod][idx]
 	_lock_cell_local = cell["position"] as Vector3
 	_locking = true
 	if planet_gridmap.is_occupied(idx):

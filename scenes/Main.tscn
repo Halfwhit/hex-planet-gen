@@ -27,7 +27,7 @@ ambient_light_energy = 0.45
 [node name="Main" type="Node3D" unique_id=171713847]
 transform = Transform3D(0.54923207, 0.8249365, -0.13350646, -0.82843506, 0.516507, -0.21660079, -0.109724864, 0.22956552, 0.9670885, 0, 0, 0)
 script = ExtResource("1_main")
-noise_seed = 44
+noise_seed = 4
 mountain_height = 0.7
 
 [node name="PlanetMesh" type="MeshInstance3D" parent="." unique_id=1846582330]

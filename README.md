@@ -74,13 +74,13 @@ Each planet is generated in three stages:
 
 ## Biomes
 
-| Zone | Biomes |
-|------|--------|
-| Ocean | Deep ocean, Shallow ocean, Tropical ocean, Icy ocean, Coastal ocean, Lake |
-| Hot (temp > 0.60) | Beach, Tropical rainforest, Savanna, Shrubland, Desert |
-| Temperate | Beach, Grassland, Shrubland, Temperate forest, Temperate rainforest |
-| Cold | Boreal forest, Tundra |
-| Alpine | Mountain, Snow, Ice |
+| Zone | Biomes | Moisture split (low → high) |
+|------|--------|-----------------------------|
+| Ocean | Deep ocean, Shallow ocean, Tropical ocean, Icy ocean, Coastal ocean, Lake | — |
+| Hot (temp > 0.60) | Beach, Desert, Shrubland, Savanna, Tropical rainforest | <0.34 / 0.34 / 0.38 / 0.43 |
+| Temperate | Beach, Shrubland, Grassland, Temperate forest, Temperate rainforest | <0.22 / 0.22 / 0.38 / 0.72 |
+| Cold | Boreal forest, Tundra | — |
+| Alpine | Mountain, Snow, Ice | — |
 
 Lakes are disconnected ocean regions smaller than 2.5 % of the planet surface.
 

@@ -147,7 +147,30 @@ LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four m
 
 **Alpine** — `BIOME_MOUNTAIN`, `BIOME_SNOW`, `BIOME_ICE`
 
+Moisture thresholds:
+
+**Temperate zone** (0.38 ≤ temperature < 0.60):
+
+| Biome | Moisture range |
+|-------|---------------|
+| Shrubland | < 0.22 |
+| Grassland | 0.22 – 0.38 |
+| Temperate forest | 0.38 – 0.72 |
+| Temperate rainforest | > 0.72 |
+
+**Hot zone** (temperature ≥ 0.60):
+
+| Biome | Moisture range |
+|-------|---------------|
+| Desert | < 0.34 |
+| Shrubland | 0.34 – 0.38 |
+| Savanna | 0.38 – 0.43 |
+| Tropical rainforest | > 0.43 |
+
+Savanna and shrubland are intentionally narrow bands so rainforest and desert each cover roughly a third of the hot-zone moisture range.
+
 Key rules:
 - Deep ocean is suppressed when `near_land` (ocean cell adjacent to land) — prevents dark navy touching the coastline.
+- `_classify_biome` accepts an optional `near_land: bool = false` parameter. `HexMap2D._map_title` passes `near_land = (moisture > 0.5)` as a proxy for coastal ocean cells (coastal moisture boost lifts them above 0.5) so the panel title matches the rendered tile colour.
 - Snow/ice never border the ocean — coastal high-altitude cells become `BIOME_MOUNTAIN`.
 - Lakes are disconnected ocean regions smaller than `n_verts / 40` cells.

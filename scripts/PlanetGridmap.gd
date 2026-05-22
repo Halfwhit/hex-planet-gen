@@ -21,9 +21,9 @@ const OUTLINE_WIDTH_FRACTION: float = 0.008
 
 var _camera: Camera3D = null
 var _planet_node: Node3D = null
-var _cells: Array = []
+var _cells: Array[Dictionary] = []
 var _cell_positions: PackedVector3Array = []
-var _neighbors: Array = []
+var _neighbors: Array[Array] = []
 var _occupied: Dictionary = {}
 var _outline_cache: Dictionary = {}
 var _fill_cache: Dictionary = {}
@@ -96,7 +96,7 @@ func _input(event: InputEvent) -> void:
 			_toggle_occupy(_selected_idx)
 
 
-func setup(camera: Camera3D, planet_node: Node3D, cells: Array, radius: float) -> void:
+func setup(camera: Camera3D, planet_node: Node3D, cells: Array[Dictionary], radius: float) -> void:
 	_free_fill_nodes()
 	_occupied.clear()
 	_fill_cache.clear()
@@ -109,7 +109,7 @@ func setup(camera: Camera3D, planet_node: Node3D, cells: Array, radius: float) -
 
 	_cell_positions.resize(cells.size())
 	for i: int in cells.size():
-		_cell_positions[i] = (cells[i] as Dictionary)["position"] as Vector3
+		_cell_positions[i] = cells[i]["position"] as Vector3
 
 	_build_neighbors()
 
@@ -129,7 +129,7 @@ func clear() -> void:
 	_select_mi.mesh = null
 
 
-func get_all_neighbors() -> Array:
+func get_all_neighbors() -> Array[Array]:
 	return _neighbors
 
 
@@ -150,11 +150,11 @@ func can_occupy(idx: int) -> bool:
 	# BFS outward up to occupation_radius hops; reject if any visited cell is
 	# already occupied (the candidate cell itself is excluded from this check).
 	var visited: Dictionary = {idx: true}
-	var frontier: Array = [idx]
+	var frontier: Array[int] = [idx]
 	for _ring: int in occupation_radius:
-		var next: Array = []
+		var next: Array[int] = []
 		for cell: int in frontier:
-			for nb: int in (_neighbors[cell] as Array):
+			for nb: int in _neighbors[cell]:
 				if visited.has(nb):
 					continue
 				if _occupied.has(nb):
@@ -168,7 +168,7 @@ func can_occupy(idx: int) -> bool:
 func _build_neighbors() -> void:
 	_neighbors.resize(_cells.size())
 	for i: int in _cells.size():
-		_neighbors[i] = []
+		_neighbors[i] = [] as Array[int]
 
 	# Map each polygon vertex to the list of cells that contain it.
 	# Vertices are snapped to a fixed-precision integer grid so that the same
@@ -177,7 +177,7 @@ func _build_neighbors() -> void:
 	const SNAP: float = 100000.0
 	var vertex_to_cells: Dictionary = {}
 	for i: int in _cells.size():
-		var poly: PackedVector3Array = (_cells[i] as Dictionary)["polygon"] as PackedVector3Array
+		var poly: PackedVector3Array = _cells[i]["polygon"] as PackedVector3Array
 		for v: Vector3 in poly:
 			var key: Vector3i = Vector3i(
 				roundi(v.x * SNAP),
@@ -192,8 +192,8 @@ func _build_neighbors() -> void:
 	# Key encodes the pair as a * MAX_CELLS + b with a < b.
 	const MAX_CELLS: int = 20000
 	var shared: Dictionary = {}
-	for cells_at_v in vertex_to_cells.values():
-		var list: Array = cells_at_v as Array
+	for cells_at_v: Array in vertex_to_cells.values():
+		var list: Array[int] = cells_at_v
 		for ai: int in list.size():
 			for bi: int in range(ai + 1, list.size()):
 				var a: int = list[ai]
@@ -205,8 +205,8 @@ func _build_neighbors() -> void:
 		if (shared[pair] as int) >= 2:
 			var a: int = pair / MAX_CELLS
 			var b: int = pair % MAX_CELLS
-			(_neighbors[a] as Array).append(b)
-			(_neighbors[b] as Array).append(a)
+			_neighbors[a].append(b)
+			_neighbors[b].append(a)
 
 
 func _toggle_occupy(idx: int) -> void:
@@ -227,8 +227,8 @@ func _toggle_occupy(idx: int) -> void:
 
 
 func _free_fill_nodes() -> void:
-	for mi in _fill_mis.values():
-		(mi as MeshInstance3D).queue_free()
+	for mi: MeshInstance3D in _fill_mis.values():
+		mi.queue_free()
 	_fill_mis.clear()
 
 
@@ -276,7 +276,7 @@ func _fill_for(cell_idx: int) -> ArrayMesh:
 
 
 func _build_outline(cell_idx: int) -> ArrayMesh:
-	var cell: Dictionary = _cells[cell_idx] as Dictionary
+	var cell: Dictionary = _cells[cell_idx]
 	var poly: PackedVector3Array = cell["polygon"] as PackedVector3Array
 	var n: int = poly.size()
 	var elev: float = _radius * OUTLINE_ELEVATION
@@ -308,7 +308,7 @@ func _build_outline(cell_idx: int) -> ArrayMesh:
 
 
 func _build_fill(cell_idx: int) -> ArrayMesh:
-	var cell: Dictionary = _cells[cell_idx] as Dictionary
+	var cell: Dictionary = _cells[cell_idx]
 	var poly: PackedVector3Array = cell["polygon"] as PackedVector3Array
 	var n: int = poly.size()
 	var elev: float = _radius * FILL_ELEVATION

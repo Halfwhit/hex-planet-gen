@@ -220,8 +220,7 @@ func generate(
 		# ── Adjacency flags ──────────────────────────────────────────────────
 		# near_ocean: land cell touching ocean → beach / moisture boost.
 		# near_land:  ocean cell touching land → suppresses deep ocean biome.
-		# The two flags are mutually exclusive (type is fixed), so `or` is the
-		# correct early-exit — `and` would never fire.
+		# The two flags are mutually exclusive because type is fixed per cell.
 		var near_ocean: bool = false
 		var near_land: bool = false
 		for fi: int in (vertex_to_faces[vi] as Array):
@@ -458,7 +457,7 @@ func _build_tectonic_heights(
 ## Exposed as a static so HexMap2D can reuse the same logic for its
 ## procedurally generated interior tiles.
 static func _classify_biome(
-		type: int,
+		terrain_type: int,
 		height: float,
 		temperature: float,
 		moisture: float,
@@ -467,7 +466,7 @@ static func _classify_biome(
 		near_land: bool = false,
 ) -> int:
 	# ── Ocean biomes ─────────────────────────────────────────────────────────
-	if type == OCEAN:
+	if terrain_type == OCEAN:
 		if temperature < 0.15:
 			return BIOME_ICY_OCEAN
 		var depth: float = land_threshold - height  # positive = below sea level
@@ -530,8 +529,9 @@ static func _classify_biome(
 		return BIOME_SHRUBLAND
 
 	# Hot zone.
-	# Thresholds calibrated for base_m=0.38 with noise ±~0.24 (range ≈ 0.14–0.62)
-	# so the noise distribution hits all four biomes in roughly equal proportion.
+	# base_m=0.38, noise ±~0.24 → effective range ≈ 0.14–0.62.
+	# Savanna (0.38–0.43) and shrubland (0.34–0.38) are intentionally narrow
+	# so rainforest and desert each cover roughly a third of the range.
 	if coastal:
 		return BIOME_BEACH
 	if moisture > 0.43:

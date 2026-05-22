@@ -53,7 +53,7 @@ func _ready() -> void:
 ## center_type / center_height: planet cell terrain for the occupied tile.
 ## center_temperature / center_moisture: climate values from HexPlanet (0–1).
 ## land_threshold: sea-level height value (same as planet).
-## border_data: Array of 6 Dicts {type, height, biome, temperature, moisture}
+## border_data: Array[Dictionary] of 6 Dicts {type, height, biome, temperature, moisture}
 ##   in EDGE_SLOTS order, from LocalMap.get_ring1_data().
 ## noise_seed: deterministic seed; pass planet noise_seed + cell_index.
 func setup(
@@ -62,7 +62,7 @@ func setup(
 		center_temperature: float,
 		center_moisture: float,
 		land_threshold: float,
-		border_data: Array,
+		border_data: Array[Dictionary],
 		noise_seed: int,
 ) -> void:
 	_land_threshold = land_threshold
@@ -102,7 +102,7 @@ func _generate_tiles(
 		center_height: float,
 		center_temperature: float,
 		center_moisture: float,
-		border_data: Array,
+		border_data: Array[Dictionary],
 		noise_seed: int,
 ) -> Array[Dictionary]:
 	# Ocean / land boundary noise.
@@ -157,7 +157,7 @@ func _generate_tiles(
 					var slot_len: float = sqrt(dpx * dpx + dpy * dpy)
 					var weight: float = max(0.0, (px * dpx + py * dpy) / (tile_len * slot_len))
 
-					var bd: Dictionary = border_data[i] as Dictionary
+					var bd: Dictionary = border_data[i]
 					w_ocean  += weight * (1.0 if (bd["type"] as int) == HexPlanet.OCEAN else 0.0)
 					w_temp   += weight * (bd.get("temperature", 0.5) as float)
 					w_moist  += weight * (bd.get("moisture", 0.5) as float)
@@ -237,9 +237,13 @@ func _hex_corners(center: Vector2, hex_size: float) -> PackedVector2Array:
 
 
 func _map_title(type: int, temperature: float, moisture: float) -> String:
+	# near_land proxy: the occupied cell doesn't carry adjacency data, so use
+	# moisture > 0.5 (coastal ocean boost lifts it above inland ocean) to
+	# suppress BIOME_DEEP_OCEAN and show BIOME_SHALLOW_OCEAN instead.
+	var near_land: bool = (type == HexPlanet.OCEAN and moisture > 0.5)
 	var biome: int = HexPlanet._classify_biome(
 			type, _land_threshold + (0.1 if type == HexPlanet.LAND else -0.1),
-			temperature, moisture, false, _land_threshold)
+			temperature, moisture, false, _land_threshold, near_land)
 	match biome:
 		HexPlanet.BIOME_DEEP_OCEAN:          return "Deep Ocean"
 		HexPlanet.BIOME_SHALLOW_OCEAN:       return "Shallow Ocean"
