@@ -242,9 +242,9 @@ func generate(
 		# mid-latitude moderate → polar dry.
 		var base_m: float
 		if lat < 0.15:
-			base_m = 0.32
+			base_m = 0.38
 		elif lat < 0.35:
-			base_m = lerpf(0.32, 0.16, (lat - 0.15) / 0.20)
+			base_m = lerpf(0.38, 0.18, (lat - 0.15) / 0.20)
 		elif lat < 0.60:
 			base_m = lerpf(0.16, 0.46, (lat - 0.35) / 0.25)
 		else:
@@ -536,11 +536,11 @@ static func _classify_biome(
 	# noise spread hits all four biomes in proportion.
 	if coastal:
 		return BIOME_BEACH
-	if moisture > 0.52:
+	if moisture > 0.46:
 		return BIOME_TROPICAL_RAINFOREST
 	if moisture > 0.38:
 		return BIOME_SAVANNA
-	if moisture > 0.24:
+	if moisture > 0.30:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
