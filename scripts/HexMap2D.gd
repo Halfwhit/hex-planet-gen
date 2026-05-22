@@ -191,9 +191,11 @@ func _generate_tiles(
 			# Near-ocean: a land tile strongly influenced by ocean borders counts
 			# as coastal for beach/grassland biome purposes.
 			var near_ocean: bool = (tile_type == HexPlanet.LAND and ocean_t > 0.28)
+			# Suppress deep-ocean biome for ocean tiles close to the land boundary.
+			var near_land: bool = (tile_type == HexPlanet.OCEAN and ocean_t < 0.65)
 
 			var tile_biome: int = HexPlanet._classify_biome(
-					tile_type, tile_height, eff_T, eff_M, near_ocean, _land_threshold)
+					tile_type, tile_height, eff_T, eff_M, near_ocean, _land_threshold, near_land)
 
 			tiles.append({
 				"q": q,

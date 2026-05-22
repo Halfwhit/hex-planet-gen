@@ -97,7 +97,6 @@ func generate(
 		vertex_to_faces[f[1]].append(fi)
 		vertex_to_faces[f[2]].append(fi)
 
-
 	# Tectonic pass — simulate plate interactions to derive per-cell heights.
 	# Sea level is then computed from the actual height distribution so that
 	# ocean_fraction is honoured regardless of seed or plate configuration.
@@ -107,12 +106,10 @@ func generate(
 			p_num_plates, p_oceanic_plate_fraction,
 			p_mountain_height, p_detail_strength)
 
-
 	var sorted_h: Array[float] = tectonic_h.duplicate()
 	sorted_h.sort()
 	land_threshold = sorted_h[clamp(int(sorted_h.size() * p_ocean_fraction), 0, sorted_h.size() - 1)]
 
-	# Pass 1 — height, type, polygon.
 	for vi: int in n_verts:
 		var pos: Vector3 = ico.vertices[vi]
 		var adj: Array = vertex_to_faces[vi]
@@ -141,7 +138,6 @@ func generate(
 			"plate_id": _cell_plate[vi],
 			"plate_oceanic": _plate_is_oceanic[_cell_plate[vi]],
 		})
-
 
 	# ── Lake detection ───────────────────────────────────────────────────────
 	# Flood-fill ocean connectivity.  Uses PackedByteArray / PackedInt32Array
@@ -190,16 +186,10 @@ func generate(
 		if comp_sizes[i] > comp_sizes[main_comp]:
 			main_comp = i
 
-	# Any disconnected ocean body smaller than this stays a lake.
-	# Bodies at or above this size are large enough to classify as sea/ocean
-	# and keep their regular ocean biomes.  2.5 % of total cells scales
-	# naturally across LOD levels (≈256 cells at LOD 3, ≈64 at LOD 2).
+	# Disconnected bodies smaller than 2.5 % of total cells become lakes;
+	# larger isolated seas keep their regular ocean biomes.
 	var lake_size_limit: int = max(1, n_verts / 40)
 
-	# comp_id is checked directly in pass 2 — no dictionary needed.
-
-	# Pass 2 — climate and biome.
-	# All types are now known so we can check adjacency for near-ocean detection.
 	for vi: int in n_verts:
 		var pos: Vector3 = ico.vertices[vi]
 		var cell: Dictionary = cells[vi]
@@ -225,8 +215,10 @@ func generate(
 				lat_warmth * (1.0 - alt * 0.42) + t_var, 0.0, 1.0)
 
 		# ── Adjacency flags ──────────────────────────────────────────────────
-		# near_ocean: land cell touching ocean → used for beach / moisture.
-		# near_land:  ocean cell touching land → prevents deep ocean at shore.
+		# near_ocean: land cell touching ocean → beach / moisture boost.
+		# near_land:  ocean cell touching land → suppresses deep ocean biome.
+		# The two flags are mutually exclusive (type is fixed), so `or` is the
+		# correct early-exit — `and` would never fire.
 		var near_ocean: bool = false
 		var near_land: bool = false
 		for fi: int in (vertex_to_faces[vi] as Array):
@@ -238,7 +230,7 @@ func generate(
 					near_ocean = true
 				elif type == OCEAN and nb_type == LAND:
 					near_land = true
-			if near_ocean and near_land:
+			if near_ocean or near_land:
 				break
 
 		# ── Moisture ─────────────────────────────────────────────────────────
@@ -271,7 +263,6 @@ func generate(
 		cell["moisture"] = moisture
 		var isolated: bool = comp_id[vi] >= 0 and comp_id[vi] != main_comp
 		cell["biome"] = BIOME_LAKE if (isolated and comp_sizes[comp_id[vi]] <= lake_size_limit) else biome
-
 
 
 ## Simulate plate tectonics and return per-vertex heights.
@@ -536,9 +527,8 @@ static func _classify_biome(
 		return BIOME_SHRUBLAND
 
 	# Hot zone.
-	# base_m is now 0.32 with noise ±~0.24, so effective range ≈ 0.08–0.56.
-	# Thresholds placed at roughly equal intervals across that range so the
-	# noise spread hits all four biomes in proportion.
+	# Thresholds calibrated for base_m=0.38 with noise ±~0.24 (range ≈ 0.14–0.62)
+	# so the noise distribution hits all four biomes in roughly equal proportion.
 	if coastal:
 		return BIOME_BEACH
 	if moisture > 0.43:
