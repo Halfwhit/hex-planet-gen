@@ -168,7 +168,7 @@ func can_occupy(idx: int) -> bool:
 func _build_neighbors() -> void:
 	_neighbors.resize(_cells.size())
 	for i: int in _cells.size():
-		_neighbors[i] = [] as Array[int]
+		_neighbors[i] = []
 
 	# Map each polygon vertex to the list of cells that contain it.
 	# Vertices are snapped to a fixed-precision integer grid so that the same
@@ -193,7 +193,7 @@ func _build_neighbors() -> void:
 	const MAX_CELLS: int = 20000
 	var shared: Dictionary = {}
 	for cells_at_v: Array in vertex_to_cells.values():
-		var list: Array[int] = cells_at_v
+		var list: Array = cells_at_v
 		for ai: int in list.size():
 			for bi: int in range(ai + 1, list.size()):
 				var a: int = list[ai]
