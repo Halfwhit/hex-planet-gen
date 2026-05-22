@@ -224,18 +224,22 @@ func generate(
 		var temperature: float = clamp(
 				lat_warmth * (1.0 - alt * 0.42) + t_var, 0.0, 1.0)
 
-		# ── Near-ocean detection (land cells only) ────────────────────────────
-		# A land cell is "near ocean" if any vertex sharing a face with it is
-		# ocean-typed.  Used for beach biome assignment.
+		# ── Adjacency flags ──────────────────────────────────────────────────
+		# near_ocean: land cell touching ocean → used for beach / moisture.
+		# near_land:  ocean cell touching land → prevents deep ocean at shore.
 		var near_ocean: bool = false
-		if type == LAND:
-			for fi: int in (vertex_to_faces[vi] as Array):
-				for vj: int in (ico.faces[fi] as Array):
-					if vj != vi and (cells[vj] as Dictionary)["type"] as int == OCEAN:
-						near_ocean = true
-						break
-				if near_ocean:
-					break
+		var near_land: bool = false
+		for fi: int in (vertex_to_faces[vi] as Array):
+			for vj: int in (ico.faces[fi] as Array):
+				if vj == vi:
+					continue
+				var nb_type: int = (cells[vj] as Dictionary)["type"] as int
+				if type == LAND and nb_type == OCEAN:
+					near_ocean = true
+				elif type == OCEAN and nb_type == LAND:
+					near_land = true
+			if near_ocean and near_land:
+				break
 
 		# ── Moisture ─────────────────────────────────────────────────────────
 		# Models the Hadley circulation: equatorial wet → subtropical dry →
@@ -261,7 +265,7 @@ func generate(
 
 		# ── Biome classification ──────────────────────────────────────────────
 		var biome: int = _classify_biome(
-				type, h, temperature, moisture, near_ocean, land_threshold)
+				type, h, temperature, moisture, near_ocean, land_threshold, near_land)
 
 		cell["temperature"] = temperature
 		cell["moisture"] = moisture
@@ -466,13 +470,15 @@ static func _classify_biome(
 		moisture: float,
 		near_ocean: bool,
 		land_threshold: float,
+		near_land: bool = false,
 ) -> int:
 	# ── Ocean biomes ─────────────────────────────────────────────────────────
 	if type == OCEAN:
 		if temperature < 0.15:
 			return BIOME_ICY_OCEAN
 		var depth: float = land_threshold - height  # positive = below sea level
-		if depth > 0.35:
+		# Deep ocean must not appear directly next to land — use shallow instead.
+		if depth > 0.35 and not near_land:
 			return BIOME_DEEP_OCEAN
 		# Coastal band — thin turquoise strip right at the waterline.
 		if depth < 0.08:
