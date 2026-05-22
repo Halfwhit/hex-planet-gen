@@ -19,6 +19,10 @@ const OUTLINE_WIDTH_FRACTION: float = 0.008
 @export var occupy_color: Color = Color(0.2, 0.9, 0.45, 0.55)
 @export var occupy_emission_energy: float = 1.5
 
+## Minimum hop distance between any two occupied cells.
+## Kept in sync with LocalMap.rings by Main.
+var occupation_radius: int = 1
+
 var _camera: Camera3D = null
 var _planet_node: Node3D = null
 var _cells: Array = []
@@ -96,6 +100,8 @@ func _input(event: InputEvent) -> void:
 			_toggle_occupy(_selected_idx)
 
 
+## Initialise the gridmap for a new planet LOD level.
+## Must be called before any picking or occupation queries.
 func setup(camera: Camera3D, planet_node: Node3D, cells: Array, radius: float) -> void:
 	_free_fill_nodes()
 	_occupied.clear()
@@ -121,6 +127,7 @@ func setup(camera: Camera3D, planet_node: Node3D, cells: Array, radius: float) -
 	clear()
 
 
+## Reset hover and selection state without clearing cell data.
 func clear() -> void:
 	_hovered_idx = -1
 	_selected_idx = -1
@@ -129,23 +136,22 @@ func clear() -> void:
 	_select_mi.mesh = null
 
 
+## Returns the full neighbour adjacency list; index i holds all edge-adjacent cell indices for cell i.
 func get_all_neighbors() -> Array[Array]:
 	return _neighbors
 
 
+## Returns the occupied-cell dictionary; keys are cell indices, values are true.
 func get_occupied_set() -> Dictionary:
 	return _occupied
 
 
+## Returns true if the cell at idx is currently occupied.
 func is_occupied(idx: int) -> bool:
 	return _occupied.has(idx)
 
 
-## Minimum hop distance between any two occupied cells.
-## Kept in sync with LocalMap.rings by Main.
-var occupation_radius: int = 1
-
-
+## Returns true if idx can be occupied without violating the occupation_radius spacing rule.
 func can_occupy(idx: int) -> bool:
 	# BFS outward up to occupation_radius hops; reject if any visited cell is
 	# already occupied (the candidate cell itself is excluded from this check).

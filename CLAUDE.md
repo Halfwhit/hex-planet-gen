@@ -11,8 +11,8 @@ Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra
 | File | Role |
 |------|------|
 | `IcoSphere.gd` | Pure data. Builds a subdivided icosahedron aligned so one pentagon pair lands at local ±Y (the planet's geographic poles). |
-| `HexPlanet.gd` | Pure data. Builds the dual mesh and runs two generation passes. Pass 1: tectonic simulation (`_build_tectonic_heights`) → per-cell height and type. Pass 2: climate (temperature, moisture) → 19-biome classification. Also runs a flood-fill lake-detection pass between the two. Each cell dict has keys `position`, `polygon`, `height`, `type`, `pentagon`, `temperature`, `moisture`, `biome`, `plate_id`, `plate_oceanic`. |
-| `HexMap2D.gd` | 2D `Control` panel. Procedurally generates a flat hex minimap for the local area around the selected cell, using the same `_classify_biome` and `terrain_color` functions as the planet surface. |
+| `HexPlanet.gd` | Pure data. Builds the dual mesh and runs two generation passes. Pass 1: tectonic simulation (`_build_tectonic_heights`) → per-cell height and type. Pass 2: climate (temperature, moisture) → 19-biome classification. Also runs a flood-fill lake-detection pass between the two. Each cell dict has keys `position`, `polygon`, `height`, `type`, `pentagon`, `temperature`, `moisture`, `biome`, `plate_id`, `plate_oceanic`. Exposes `biome_name(biome)` as the single authoritative int→String mapping used by LocalMap and HexMap2D. |
+| `HexMap2D.gd` | 2D `Control` panel. Procedurally generates a flat hex minimap for the local area around the selected cell, using the same `_classify_biome` and `terrain_color` functions as the planet surface. Panel title comes from `HexPlanet.biome_name` applied to the pre-computed biome passed via `setup()`. Static `_UNIT_HEX_OFFSETS` and `_SLOT_DIRS` are precomputed once to avoid per-frame trig and per-tile sqrt calls. |
 | `PlanetMesh.gd` | Stateless static builder. Converts HexPlanet cells to an ArrayMesh via SurfaceTool. Exposes `terrain_color()` and `_biome_color()` as public statics so `LocalMap` and `HexMap2D` share the same colour palette. Supports `debug_plates` mode to colour by tectonic plate. |
 | `PlanetGridmap.gd` | Cell picking, hover/select outlines, occupation (fill meshes), and neighbour graph. Only active at LOD 3. Builds the adjacency graph from shared polygon vertices once per `setup()` call. |
 | `LocalMap.gd` | 2D CanvasLayer panel. Shows a flat-top hex minimap of the ring-1 (and optionally ring-N) neighbours around an occupied cell. Orientation is always aligned with the camera view. |
@@ -94,6 +94,8 @@ The HorizonMask sphere sits at `1.025 × planet_radius`. `depth_draw_never` mean
 ### 15. `PlanetMesh.terrain_color()` is the single authoritative colour ramp
 
 Both `PlanetMesh.build()` and `LocalMap._draw()` call `PlanetMesh.terrain_color()`. Do not duplicate this function. The public static signature takes `(height, type, land_threshold, highlight_pentagon)` — individual values, not a cell dictionary.
+
+`HexPlanet.biome_name(biome)` is the single authoritative biome int→String mapping. Both `LocalMap._cell_description()` and `HexMap2D.setup()` call it. Do not add a third copy of the `match biome:` block.
 
 ### 16. Occupation radius equals map_rings
 

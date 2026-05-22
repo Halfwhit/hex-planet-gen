@@ -5,6 +5,7 @@ extends Control
 signal closed
 
 ## Number of hex rings to display around the centre cell.
+## Must match PlanetGridmap.occupation_radius so the minimap covers the full exclusion zone.
 var rings: int = 1
 ## Highlight the 12 pentagon tiles in magenta for debug purposes.
 var debug_pentagons: bool = false
@@ -355,27 +356,10 @@ func _hex_corners(center: Vector2) -> PackedVector2Array:
 
 func _cell_description(cell: Dictionary) -> String:
 	var biome: int = cell.get("biome", -1) as int
-	match biome:
-		HexPlanet.BIOME_DEEP_OCEAN:          return "Deep Ocean"
-		HexPlanet.BIOME_SHALLOW_OCEAN:       return "Shallow Ocean"
-		HexPlanet.BIOME_TROPICAL_OCEAN:      return "Tropical Ocean"
-		HexPlanet.BIOME_ICY_OCEAN:           return "Icy Ocean"
-		HexPlanet.BIOME_COASTAL_OCEAN:       return "Coastal Waters"
-		HexPlanet.BIOME_LAKE:                return "Lake"
-		HexPlanet.BIOME_BEACH:               return "Beach"
-		HexPlanet.BIOME_TROPICAL_RAINFOREST: return "Tropical Rainforest"
-		HexPlanet.BIOME_SAVANNA:             return "Savanna"
-		HexPlanet.BIOME_DESERT:              return "Desert"
-		HexPlanet.BIOME_GRASSLAND:           return "Grassland"
-		HexPlanet.BIOME_SHRUBLAND:           return "Shrubland"
-		HexPlanet.BIOME_TEMPERATE_FOREST:    return "Temperate Forest"
-		HexPlanet.BIOME_TEMPERATE_RAINFOREST:return "Temperate Rainforest"
-		HexPlanet.BIOME_BOREAL_FOREST:       return "Boreal Forest"
-		HexPlanet.BIOME_TUNDRA:              return "Tundra"
-		HexPlanet.BIOME_MOUNTAIN:            return "Mountain"
-		HexPlanet.BIOME_SNOW:                return "Snow"
-		HexPlanet.BIOME_ICE:                 return "Ice"
-	# Fallback for cells missing biome data (e.g. editor preview).
+	var name: String = HexPlanet.biome_name(biome)
+	if not name.is_empty():
+		return name
+	# Fallback for cells with biome == -1 (before pass 2 runs, e.g. editor preview).
 	var is_ocean: bool = (cell["type"] as int) == 0
 	var h: float = cell["height"] as float
 	if is_ocean:

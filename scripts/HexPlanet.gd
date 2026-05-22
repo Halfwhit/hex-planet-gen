@@ -355,9 +355,7 @@ func _build_tectonic_heights(
 
 	# ── 4. Boundary convergence ──────────────────────────────────────────────
 	var boundary_effect: Array[float] = []
-	boundary_effect.resize(n_verts)
-	for i: int in n_verts:
-		boundary_effect[i] = 0.0
+	boundary_effect.resize(n_verts)  # GDScript default-initialises float elements to 0.0
 
 	for vi: int in n_verts:
 		var my_p: int = cell_plate[vi]
@@ -541,6 +539,32 @@ static func _classify_biome(
 	if moisture > 0.34:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
+
+
+## Return the display name for a biome constant, or "" for unrecognised values.
+## Used by LocalMap and HexMap2D to label tiles consistently.
+static func biome_name(biome: int) -> String:
+	match biome:
+		BIOME_DEEP_OCEAN:           return "Deep Ocean"
+		BIOME_SHALLOW_OCEAN:        return "Shallow Ocean"
+		BIOME_TROPICAL_OCEAN:       return "Tropical Ocean"
+		BIOME_ICY_OCEAN:            return "Icy Ocean"
+		BIOME_COASTAL_OCEAN:        return "Coastal Waters"
+		BIOME_LAKE:                 return "Lake"
+		BIOME_BEACH:                return "Beach"
+		BIOME_TROPICAL_RAINFOREST:  return "Tropical Rainforest"
+		BIOME_SAVANNA:              return "Savanna"
+		BIOME_DESERT:               return "Desert"
+		BIOME_GRASSLAND:            return "Grassland"
+		BIOME_SHRUBLAND:            return "Shrubland"
+		BIOME_TEMPERATE_FOREST:     return "Temperate Forest"
+		BIOME_TEMPERATE_RAINFOREST: return "Temperate Rainforest"
+		BIOME_BOREAL_FOREST:        return "Boreal Forest"
+		BIOME_TUNDRA:               return "Tundra"
+		BIOME_MOUNTAIN:             return "Mountain"
+		BIOME_SNOW:                 return "Snow"
+		BIOME_ICE:                  return "Ice"
+	return ""
 
 
 ## Returns polygon corners in counter-clockwise order when viewed from outside

@@ -21,10 +21,37 @@ const EDGE_SLOTS: Array[Vector2i] = [
 @export var border_color: Color = Color(0.0, 0.0, 0.0, 0.25)
 @export var grid_line_width: float = 0.8
 
+# Unit hex corner offsets (radius = 1.0); scaled by hex_size at draw time.
+# Avoids recomputing trig on every _draw call.
+static var _UNIT_HEX_OFFSETS: PackedVector2Array = _init_unit_hex_offsets()
+
+# Normalised direction vectors for each EDGE_SLOTS entry.
+# Precomputed once so _generate_tiles avoids 6 sqrt calls per tile.
+static var _SLOT_DIRS: PackedVector2Array = _init_slot_dirs()
+
 var _tiles: Array[Dictionary] = []
 var _land_threshold: float = 0.0
+var _center_biome: int = -1
 var _title_label: Label
 var _close_btn: Button
+
+
+static func _init_unit_hex_offsets() -> PackedVector2Array:
+	var pts: PackedVector2Array = PackedVector2Array()
+	for i: int in 6:
+		var a: float = deg_to_rad(60.0 * float(i))
+		pts.append(Vector2(cos(a), sin(a)))
+	return pts
+
+
+static func _init_slot_dirs() -> PackedVector2Array:
+	var dirs: PackedVector2Array = PackedVector2Array()
+	for slot: Vector2i in EDGE_SLOTS:
+		var dpx: float = -1.5 * float(slot.x)
+		var dpy: float = SQRT3 * (float(slot.y) + float(slot.x) * 0.5)
+		var l: float = sqrt(dpx * dpx + dpy * dpy)
+		dirs.append(Vector2(dpx / l, dpy / l))
+	return dirs
 
 
 func _ready() -> void:
@@ -50,7 +77,7 @@ func _ready() -> void:
 
 
 ## Build and display the 2D map.
-## center_type / center_height: planet cell terrain for the occupied tile.
+## center_type / center_height / center_biome: planet cell terrain for the occupied tile.
 ## center_temperature / center_moisture: climate values from HexPlanet (0–1).
 ## land_threshold: sea-level height value (same as planet).
 ## border_data: Array[Dictionary] of 6 Dicts {type, height, biome, temperature, moisture}
@@ -61,15 +88,17 @@ func setup(
 		center_height: float,
 		center_temperature: float,
 		center_moisture: float,
+		center_biome: int,
 		land_threshold: float,
 		border_data: Array[Dictionary],
 		noise_seed: int,
 ) -> void:
 	_land_threshold = land_threshold
+	_center_biome = center_biome
 	_tiles = _generate_tiles(
 			center_type, center_height, center_temperature, center_moisture,
 			border_data, noise_seed)
-	_title_label.text = _map_title(center_type, center_temperature, center_moisture)
+	_title_label.text = HexPlanet.biome_name(_center_biome)
 	queue_redraw()
 
 
@@ -80,13 +109,17 @@ func _draw() -> void:
 
 	var hex_size: float = _compute_hex_size()
 	var origin: Vector2 = Vector2(size.x * 0.5, HEADER_H + (size.y - HEADER_H) * 0.5)
+	# Pre-allocate once; reused for every tile's border polyline.
+	var ring_pts: PackedVector2Array = PackedVector2Array()
+	ring_pts.resize(7)
 
 	for tile: Dictionary in _tiles:
 		var pos: Vector2 = origin + _axial_to_pixel(tile["q"] as int, tile["r"] as int, hex_size)
 		var corners: PackedVector2Array = _hex_corners(pos, hex_size)
 		draw_colored_polygon(corners, tile["color"] as Color)
-		var ring_pts: PackedVector2Array = corners
-		ring_pts.append(corners[0])
+		for i: int in 6:
+			ring_pts[i] = corners[i]
+		ring_pts[6] = corners[0]
 		draw_polyline(ring_pts, border_color, grid_line_width, true)
 
 
@@ -150,12 +183,8 @@ func _generate_tiles(
 				var tile_len: float = sqrt(px * px + py * py)
 
 				for i: int in EDGE_SLOTS.size():
-					var dq: int = EDGE_SLOTS[i].x
-					var dr: int = EDGE_SLOTS[i].y
-					var dpx: float = -1.5 * float(dq)
-					var dpy: float = SQRT3 * (float(dr) + float(dq) * 0.5)
-					var slot_len: float = sqrt(dpx * dpx + dpy * dpy)
-					var weight: float = max(0.0, (px * dpx + py * dpy) / (tile_len * slot_len))
+					var sd: Vector2 = _SLOT_DIRS[i]
+					var weight: float = max(0.0, (px * sd.x + py * sd.y) / tile_len)
 
 					var bd: Dictionary = border_data[i]
 					w_ocean  += weight * (1.0 if (bd["type"] as int) == HexPlanet.OCEAN else 0.0)
@@ -211,10 +240,9 @@ func _generate_tiles(
 
 ## Fit the hex grid inside the usable panel area.
 func _compute_hex_size() -> float:
-	var usable_w: float = size.x
 	var usable_h: float = size.y - HEADER_H
 	# Width of grid: (3 * MAP_RADIUS + 2) * hex_size
-	var fit_w: float = usable_w / (3.0 * float(MAP_RADIUS) + 2.0)
+	var fit_w: float = size.x / (3.0 * float(MAP_RADIUS) + 2.0)
 	# Height of grid: sqrt(3) * (2 * MAP_RADIUS + 1) * hex_size
 	var fit_h: float = usable_h / (SQRT3 * float(2 * MAP_RADIUS + 1))
 	return min(fit_w, fit_h) * 0.94
@@ -230,38 +258,6 @@ func _axial_to_pixel(q: int, r: int, hex_size: float) -> Vector2:
 
 func _hex_corners(center: Vector2, hex_size: float) -> PackedVector2Array:
 	var pts: PackedVector2Array = PackedVector2Array()
-	for i: int in 6:
-		var a: float = deg_to_rad(60.0 * float(i))
-		pts.append(center + Vector2(cos(a), sin(a)) * hex_size)
+	for off: Vector2 in _UNIT_HEX_OFFSETS:
+		pts.append(center + off * hex_size)
 	return pts
-
-
-func _map_title(type: int, temperature: float, moisture: float) -> String:
-	# near_land proxy: the occupied cell doesn't carry adjacency data, so use
-	# moisture > 0.5 (coastal ocean boost lifts it above inland ocean) to
-	# suppress BIOME_DEEP_OCEAN and show BIOME_SHALLOW_OCEAN instead.
-	var near_land: bool = (type == HexPlanet.OCEAN and moisture > 0.5)
-	var biome: int = HexPlanet._classify_biome(
-			type, _land_threshold + (0.1 if type == HexPlanet.LAND else -0.1),
-			temperature, moisture, false, _land_threshold, near_land)
-	match biome:
-		HexPlanet.BIOME_DEEP_OCEAN:          return "Deep Ocean"
-		HexPlanet.BIOME_SHALLOW_OCEAN:       return "Shallow Ocean"
-		HexPlanet.BIOME_TROPICAL_OCEAN:      return "Tropical Ocean"
-		HexPlanet.BIOME_ICY_OCEAN:           return "Icy Ocean"
-		HexPlanet.BIOME_COASTAL_OCEAN:       return "Coastal Waters"
-		HexPlanet.BIOME_LAKE:                return "Lake"
-		HexPlanet.BIOME_BEACH:               return "Beach"
-		HexPlanet.BIOME_TROPICAL_RAINFOREST: return "Tropical Rainforest"
-		HexPlanet.BIOME_SAVANNA:             return "Savanna"
-		HexPlanet.BIOME_DESERT:              return "Desert"
-		HexPlanet.BIOME_GRASSLAND:           return "Grassland"
-		HexPlanet.BIOME_SHRUBLAND:           return "Shrubland"
-		HexPlanet.BIOME_TEMPERATE_FOREST:    return "Temperate Forest"
-		HexPlanet.BIOME_TEMPERATE_RAINFOREST:return "Temperate Rainforest"
-		HexPlanet.BIOME_BOREAL_FOREST:       return "Boreal Forest"
-		HexPlanet.BIOME_TUNDRA:              return "Tundra"
-		HexPlanet.BIOME_MOUNTAIN:            return "Mountain"
-		HexPlanet.BIOME_SNOW:                return "Snow"
-		HexPlanet.BIOME_ICE:                 return "Ice"
-	return "Unknown Terrain"
