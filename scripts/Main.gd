@@ -61,7 +61,7 @@ var _gen_btn: Callable = _editor_generate
 
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
-var _lod_cells: Array[Array] = []
+var _lod_cells: Array = []
 var _spin_angle: float = 0.0
 var _land_threshold: float = 0.0
 var _rotation_speed_rad: float = 0.0
@@ -194,7 +194,7 @@ func _set_lod(lod: int) -> void:
 		return
 	_current_lod = lod
 	planet_mesh_instance.mesh = _lod_meshes[_current_lod]
-	var cells: Array[Dictionary] = _lod_cells[_current_lod] if _current_lod == 3 else []
+	var cells: Array = _lod_cells[_current_lod] if _current_lod == 3 else []
 	planet_gridmap.setup(orbit_camera.camera, planet_mesh_instance, cells, planet_radius)
 	# Do NOT clear _locking here — _lock_cell_local is a unit vector on the
 	# sphere, valid at any LOD.  Keeping the lock alive means a selected tile

@@ -126,7 +126,7 @@ LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four m
 
 - **`clamp()` returns `Variant`** in GDScript 4 strict mode. Always write `var x: float = clamp(...)`, never `var x := clamp(...)`.
 - **Typed for-loop variables** (`for v: Vector3 in array`) require Godot 4.3+.
-- **`Array[T]` typed arrays cannot be stored in `Array[U]`** without type erasure, and casting back with `as Array[T]` silently returns an empty array rather than failing loudly. Store cell arrays in a plain `Array` (`_lod_cells: Array`) and use explicit `as Dictionary` / `as Vector3` casts at each access site.
+- **`Array[T]` typed arrays cannot be stored in `Array[U]`** without type erasure, and casting back with `as Array[T]` silently returns an empty array rather than failing loudly. Store cell arrays in a plain `Array` (`_lod_cells: Array`) and use explicit `as Dictionary` / `as Vector3` casts at each access site. Corollary: function parameters that receive arrays flowing out of `_lod_cells` must also be `Array`, not `Array[Dictionary]` — otherwise Godot throws "Trying to assign an array of type Array to a variable of type Array[Dictionary]" at the call site.
 - **`emit_signal("name", ...)`** is the old API. Prefer `signal_name.emit(...)`.
 - **`@export_tool_button`** requires Godot 4.3+.
 - **`Color.opaque` does not exist** in Godot 4. To strip alpha from a color use `Color(c.r, c.g, c.b, 1.0)`.

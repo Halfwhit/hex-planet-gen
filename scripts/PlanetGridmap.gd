@@ -96,7 +96,7 @@ func _input(event: InputEvent) -> void:
 			_toggle_occupy(_selected_idx)
 
 
-func setup(camera: Camera3D, planet_node: Node3D, cells: Array[Dictionary], radius: float) -> void:
+func setup(camera: Camera3D, planet_node: Node3D, cells: Array, radius: float) -> void:
 	_free_fill_nodes()
 	_occupied.clear()
 	_fill_cache.clear()

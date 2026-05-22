@@ -57,8 +57,8 @@ func _ready() -> void:
 
 func setup(
 		center_idx: int,
-		cells: Array[Dictionary],
-		all_neighbors: Array[Array],
+		cells: Array,
+		all_neighbors: Array,
 		occupied: Dictionary,
 		land_threshold: float,
 		cam_up_local: Vector3,
@@ -136,8 +136,8 @@ func _draw() -> void:
 
 func _build_region(
 		center_idx: int,
-		cells: Array[Dictionary],
-		all_neighbors: Array[Array],
+		cells: Array,
+		all_neighbors: Array,
 		occupied: Dictionary,
 		cam_up_local: Vector3,
 ) -> Array[Dictionary]:
