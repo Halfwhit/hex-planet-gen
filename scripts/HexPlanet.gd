@@ -501,11 +501,9 @@ static func _classify_biome(
 		return BIOME_TUNDRA
 
 	# Mountain zone.  Coastal cells stay rocky (no snow bordering the ocean).
-	# alt > 0.52 clips the low-elevation skirts that were making ranges too
-	# wide; those border cells fall through to forest/grassland instead.
 	# Snow threshold 0.50: tropical mountains stay rocky; mid-latitude and
 	# polar mountains get snow once altitude cooling brings temp below 0.50.
-	if alt > 0.52:
+	if alt > 0.60:
 		if near_ocean or temperature >= 0.50:
 			return BIOME_MOUNTAIN
 		return BIOME_SNOW
