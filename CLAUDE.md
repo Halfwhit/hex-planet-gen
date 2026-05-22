@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra hex grid (dual of a subdivided icosahedron), coloured by a single noise layer, and rendered with atmospheric effects. Four pre-generated LOD levels swap in and out based on camera distance. At LOD 3 cells are interactively selectable; pressing **E** on a selected cell occupies it and opens a 2D local-map panel showing the surrounding ring of neighbours.
+Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra hex grid (dual of a subdivided icosahedron). Terrain is generated via a tectonic plate simulation (Voronoi plates, domain-warped boundaries, Bellman-Ford elevation propagation) and coloured using a 19-biome classification system driven by latitude, altitude, temperature, and moisture. Four pre-generated LOD levels swap in and out based on camera distance. At LOD 3 cells are interactively selectable; pressing **E** on a selected cell occupies it and opens a 2D local-map panel showing the surrounding ring of neighbours.
 
 ---
 
@@ -11,8 +11,9 @@ Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra
 | File | Role |
 |------|------|
 | `IcoSphere.gd` | Pure data. Builds a subdivided icosahedron aligned so one pentagon pair lands at local ±Y (the planet's geographic poles). |
-| `HexPlanet.gd` | Pure data. Takes an IcoSphere and builds the dual mesh: one hex cell per icosphere vertex. Each cell dict has keys `position`, `polygon`, `height`, `type`, `pentagon`. |
-| `PlanetMesh.gd` | Stateless static builder. Converts HexPlanet cells to an ArrayMesh via SurfaceTool. Exposes `terrain_color()` as a public static so `LocalMap` can reuse the same colour ramp. |
+| `HexPlanet.gd` | Pure data. Builds the dual mesh and runs two generation passes. Pass 1: tectonic simulation (`_build_tectonic_heights`) → per-cell height and type. Pass 2: climate (temperature, moisture) → 19-biome classification. Also runs a flood-fill lake-detection pass between the two. Each cell dict has keys `position`, `polygon`, `height`, `type`, `pentagon`, `temperature`, `moisture`, `biome`, `plate_id`, `plate_oceanic`. Exposes `biome_name(biome)` as the single authoritative int→String mapping used by LocalMap and HexMap2D. |
+| `HexMap2D.gd` | 2D `Control` panel. Procedurally generates a flat hex minimap for the local area around the selected cell, using the same `_classify_biome` and `terrain_color` functions as the planet surface. Panel title comes from `HexPlanet.biome_name` applied to the pre-computed biome passed via `setup()`. Static `_UNIT_HEX_OFFSETS` and `_SLOT_DIRS` are precomputed once to avoid per-frame trig and per-tile sqrt calls. |
+| `PlanetMesh.gd` | Stateless static builder. Converts HexPlanet cells to an ArrayMesh via SurfaceTool. Exposes `terrain_color()` and `_biome_color()` as public statics so `LocalMap` and `HexMap2D` share the same colour palette. Supports `debug_plates` mode to colour by tectonic plate. |
 | `PlanetGridmap.gd` | Cell picking, hover/select outlines, occupation (fill meshes), and neighbour graph. Only active at LOD 3. Builds the adjacency graph from shared polygon vertices once per `setup()` call. |
 | `LocalMap.gd` | 2D CanvasLayer panel. Shows a flat-top hex minimap of the ring-1 (and optionally ring-N) neighbours around an occupied cell. Orientation is always aligned with the camera view. |
 | `OrbitCamera.gd` | Node3D with Camera3D child. Mouse-drag orbit, scroll zoom, idle auto-orbit, and north-roll correction that keeps orbital north (world Y) at the top of the screen. |
@@ -44,9 +45,9 @@ const _HORIZON_SHADER: Shader = preload("res://shaders/HorizonMask.gdshader")
 
 `:=` on a `preload()` result infers `Variant` and is a compile error when warnings are treated as errors. Explicit `: Shader =` is required.
 
-### 4. Adaptive sea level — `ocean_fraction` not a fixed threshold
+### 4. Adaptive sea level — `ocean_fraction` percentile of tectonic heights
 
-FastNoiseLite with FBM can be strongly biased toward positive values for a given seed and sampling scale. `_compute_sea_level()` samples the noise at a probe sphere (subdivision 3, 642 vertices) and returns the `ocean_fraction` percentile of the height distribution, guaranteeing the target ocean/land ratio regardless of seed or scale.
+After `_build_tectonic_heights()` returns the per-vertex elevation array, `generate()` sorts it and picks the `ocean_fraction` percentile as `land_threshold`. This guarantees the target ocean/land ratio regardless of seed, plate count, or convergence strength. `land_threshold` is stored on the `HexPlanet` instance and used by both biome classification and `PlanetMesh.terrain_color()`.
 
 ### 5. SurfaceTool drops ARRAY_COLOR when all vertex colors are identical
 
@@ -94,6 +95,8 @@ The HorizonMask sphere sits at `1.025 × planet_radius`. `depth_draw_never` mean
 
 Both `PlanetMesh.build()` and `LocalMap._draw()` call `PlanetMesh.terrain_color()`. Do not duplicate this function. The public static signature takes `(height, type, land_threshold, highlight_pentagon)` — individual values, not a cell dictionary.
 
+`HexPlanet.biome_name(biome)` is the single authoritative biome int→String mapping. Both `LocalMap._cell_description()` and `HexMap2D.setup()` call it. Do not add a third copy of the `match biome:` block.
+
 ### 16. Occupation radius equals map_rings
 
 `planet_gridmap.occupation_radius` and `_local_map.rings` are both set from `Main.map_rings`. This enforces that two occupied cells are always at least `map_rings` hops apart (guaranteeing no overlap in their displayed local maps). Keep these in sync.
@@ -104,16 +107,20 @@ Both `PlanetMesh.build()` and `LocalMap._draw()` call `PlanetMesh.terrain_color(
 
 ```
 Main._generate_planet()
-  └─ _make_noise()                  FastNoiseLite, seed/freq/octaves
-  └─ _compute_sea_level(noise)      642-vertex probe → ocean_fraction percentile
+  └─ _make_noise()                       FastNoiseLite (seed, freq, octaves)
   └─ for sub in [2, 3, 4, 5]:
-       IcoSphere.generate(sub)      icosahedron + sub subdivision passes
-       HexPlanet.generate(ico, ...) dual mesh + noise sampling
-       PlanetMesh.build(planet, r)  SurfaceTool → ArrayMesh + StandardMaterial3D
+       IcoSphere.generate(sub)           icosahedron + sub subdivision passes
+       HexPlanet.generate(ico, noise, …)
+         ├─ _build_tectonic_heights()    plates → Bellman-Ford elevation
+         ├─ sorted percentile → land_threshold
+         ├─ pass 1: height / type / polygon per cell
+         ├─ flood-fill lake detection    (PackedInt32Array BFS)
+         └─ pass 2: temperature / moisture / biome per cell
+       PlanetMesh.build(planet, r)       SurfaceTool → ArrayMesh
        _lod_cells.append(planet.cells)
 ```
 
-LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four meshes are held in `_lod_meshes: Array[ArrayMesh]` and the four cell arrays in `_lod_cells: Array` (plain untyped array — see gotcha below). Neither is regenerated at runtime. LOD switch calls `planet_gridmap.setup()` with real cells only at LOD 3 (empty array otherwise) and clears the camera lock and local map.
+LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four meshes are held in `_lod_meshes: Array[ArrayMesh]` and the four cell arrays in `_lod_cells: Array` (plain untyped array — see gotcha below). Neither is regenerated at runtime. LOD switch calls `planet_gridmap.setup()` with real cells only at LOD 3 (empty array otherwise) and clears the local map.
 
 ---
 
@@ -121,18 +128,51 @@ LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four m
 
 - **`clamp()` returns `Variant`** in GDScript 4 strict mode. Always write `var x: float = clamp(...)`, never `var x := clamp(...)`.
 - **Typed for-loop variables** (`for v: Vector3 in array`) require Godot 4.3+.
-- **`Array[T]` typed arrays cannot be stored in `Array[U]`** without type erasure, and casting back with `as Array[T]` silently returns an empty array rather than failing loudly. Store cell arrays in a plain `Array` (`_lod_cells: Array`) and use explicit `as Dictionary` / `as Vector3` casts at each access site.
+- **`Array[T]` typed arrays cannot be stored in `Array[U]`** without type erasure, and casting back with `as Array[T]` silently returns an empty array rather than failing loudly. Store cell arrays in a plain `Array` (`_lod_cells: Array`) and use explicit `as Dictionary` / `as Vector3` casts at each access site. Corollary: function parameters that receive arrays flowing out of `_lod_cells` must also be `Array`, not `Array[Dictionary]` — otherwise Godot throws "Trying to assign an array of type Array to a variable of type Array[Dictionary]" at the call site.
 - **`emit_signal("name", ...)`** is the old API. Prefer `signal_name.emit(...)`.
 - **`@export_tool_button`** requires Godot 4.3+.
 - **`Color.opaque` does not exist** in Godot 4. To strip alpha from a color use `Color(c.r, c.g, c.b, 1.0)`.
 
 ---
 
-## Terrain colour ramp
+## Biome system
 
-| Height range (relative to sea level) | Colour |
-|---------------------------------------|--------|
-| Ocean deep → shallow | Dark navy `(0.04, 0.12, 0.42)` → sky blue `(0.18, 0.48, 0.72)` |
-| Land low (0–50 %) | Dark green → mid green |
-| Land mid (50–80 %) | Mid green → rocky grey |
-| Land high (80–100 %) | Rocky grey → snow white |
+`HexPlanet._classify_biome()` (static, called from `generate()`, `HexMap2D`, and `LocalMap`) maps each cell to one of 19 constants:
+
+**Ocean** — `BIOME_DEEP_OCEAN`, `BIOME_SHALLOW_OCEAN`, `BIOME_TROPICAL_OCEAN`, `BIOME_ICY_OCEAN`, `BIOME_COASTAL_OCEAN`, `BIOME_LAKE`
+
+**Hot zone** (temperature > 0.60) — `BIOME_BEACH`, `BIOME_TROPICAL_RAINFOREST`, `BIOME_SAVANNA`, `BIOME_SHRUBLAND`, `BIOME_DESERT`
+
+**Temperate zone** — `BIOME_BEACH`, `BIOME_GRASSLAND`, `BIOME_SHRUBLAND`, `BIOME_TEMPERATE_FOREST`, `BIOME_TEMPERATE_RAINFOREST`
+
+**Cold zone** — `BIOME_BOREAL_FOREST`, `BIOME_TUNDRA`
+
+**Alpine** — `BIOME_MOUNTAIN`, `BIOME_SNOW`, `BIOME_ICE`
+
+Moisture thresholds:
+
+**Temperate zone** (0.38 ≤ temperature < 0.60):
+
+| Biome | Moisture range |
+|-------|---------------|
+| Shrubland | < 0.22 |
+| Grassland | 0.22 – 0.38 |
+| Temperate forest | 0.38 – 0.72 |
+| Temperate rainforest | > 0.72 |
+
+**Hot zone** (temperature ≥ 0.60):
+
+| Biome | Moisture range |
+|-------|---------------|
+| Desert | < 0.34 |
+| Shrubland | 0.34 – 0.38 |
+| Savanna | 0.38 – 0.43 |
+| Tropical rainforest | > 0.43 |
+
+Savanna and shrubland are intentionally narrow bands so rainforest and desert each cover roughly a third of the hot-zone moisture range.
+
+Key rules:
+- Deep ocean is suppressed when `near_land` (ocean cell adjacent to land) — prevents dark navy touching the coastline.
+- `_classify_biome` accepts an optional `near_land: bool = false` parameter. `HexMap2D._map_title` passes `near_land = (moisture > 0.5)` as a proxy for coastal ocean cells (coastal moisture boost lifts them above 0.5) so the panel title matches the rendered tile colour.
+- Snow/ice never border the ocean — coastal high-altitude cells become `BIOME_MOUNTAIN`.
+- Lakes are disconnected ocean regions smaller than `n_verts / 40` cells.

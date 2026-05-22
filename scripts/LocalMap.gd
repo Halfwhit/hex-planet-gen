@@ -4,14 +4,17 @@ extends Control
 
 signal closed
 
+## Number of hex rings to display around the centre cell.
+## Must match PlanetGridmap.occupation_radius so the minimap covers the full exclusion zone.
 var rings: int = 1
+## Highlight the 12 pentagon tiles in magenta for debug purposes.
 var debug_pentagons: bool = false
 const HEX_SIZE: float = 28.0
 const SQRT3: float = 1.7320508
 const HEADER_H: float = 44.0
 
 # Flat-top axial hex directions (q, r).
-const HEX_DIRS: Array = [
+const HEX_DIRS: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1),
 	Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1),
 ]
@@ -25,7 +28,7 @@ static var _HEX_OFFSETS: PackedVector2Array = _init_hex_offsets()
 @export var center_border_color: Color = Color(0.95, 0.85, 0.2, 1.0)
 @export var occupied_tint: Color = Color(0.2, 0.9, 0.45, 0.3)
 
-var _region: Array = []
+var _region: Array[Dictionary] = []
 var _land_threshold: float = 0.0
 var _title_label: Label
 var _close_btn: Button
@@ -64,9 +67,42 @@ func setup(
 	_land_threshold = land_threshold
 	_region = _build_region(center_idx, cells, all_neighbors, occupied, cam_up_local)
 
-	var center_cell: Dictionary = cells[center_idx] as Dictionary
+	var center_cell: Dictionary = cells[center_idx]
 	_title_label.text = _cell_description(center_cell)
 	queue_redraw()
+
+
+## Returns the 6 ring-1 neighbour data in HEX_DIRS / EDGE_SLOTS order.
+## Each element is a Dictionary {type, height, biome, temperature, moisture}.
+## Call after setup() so _region is populated.  Used by HexMap2D to seed
+## its border terrain with full climate information.
+func get_ring1_data() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for i: int in 6:
+		result.append({
+			"type": HexPlanet.OCEAN,
+			"height": -0.5,
+			"biome": HexPlanet.BIOME_SHALLOW_OCEAN,
+			"temperature": 0.5,
+			"moisture": 0.5,
+		})
+	for entry: Dictionary in _region:
+		var q: int = entry["q"] as int
+		var r: int = entry["r"] as int
+		if (abs(q) + abs(r) + abs(q + r)) / 2 != 1:
+			continue
+		var coord: Vector2i = Vector2i(q, r)
+		for i: int in HEX_DIRS.size():
+			if HEX_DIRS[i] == coord:
+				result[i] = {
+					"type": entry["type"] as int,
+					"height": entry["height"] as float,
+					"biome": entry["biome"] as int,
+					"temperature": entry.get("temperature", 0.5) as float,
+					"moisture": entry.get("moisture", 0.5) as float,
+				}
+				break
+	return result
 
 
 func _draw() -> void:
@@ -85,7 +121,8 @@ func _draw() -> void:
 				entry["height"] as float,
 				entry["type"] as int,
 				_land_threshold,
-				debug_pentagons and entry["pentagon"] as bool))
+				debug_pentagons and entry["pentagon"] as bool,
+				entry["biome"] as int))
 
 		if entry["is_occupied"] as bool:
 			draw_colored_polygon(corners, occupied_tint)
@@ -104,8 +141,8 @@ func _build_region(
 		all_neighbors: Array,
 		occupied: Dictionary,
 		cam_up_local: Vector3,
-) -> Array:
-	var center_pos: Vector3 = (cells[center_idx] as Dictionary)["position"] as Vector3
+) -> Array[Dictionary]:
+	var center_pos: Vector3 = cells[center_idx]["position"] as Vector3
 
 	# Orient the tangent frame using orbital north (world Y) expressed in planet-local
 	# space at the current spin angle — supplied as cam_up_local by Main._cam_up_local().
@@ -142,8 +179,8 @@ func _build_region(
 	var claimed: Dictionary = {Vector2i(0, 0): true}
 
 	# --- Ring-1: greedy bipartite matching ---
-	var ring1_candidates: Array = (all_neighbors[center_idx] as Array).duplicate()
-	var ring1_slots: Array = [
+	var ring1_candidates: Array = all_neighbors[center_idx].duplicate()
+	var ring1_slots: Array[Vector2i] = [
 		Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1),
 		Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1),
 	]
@@ -152,14 +189,14 @@ func _build_region(
 		var best_ci: int = 0
 		var best_si: int = 0
 		for ci: int in ring1_candidates.size():
-			var nb: int = ring1_candidates[ci] as int
-			var to_pos: Vector3 = (cells[nb] as Dictionary)["position"] as Vector3
+			var nb: int = ring1_candidates[ci]
+			var to_pos: Vector3 = cells[nb]["position"] as Vector3
 			var dx: float = to_pos.dot(e1) - center_pos.dot(e1)
 			var dy: float = to_pos.dot(e2) - center_pos.dot(e2)
 			for si: int in ring1_slots.size():
 				var pv: Vector2 = _axial_to_pixel(
-						(ring1_slots[si] as Vector2i).x,
-						(ring1_slots[si] as Vector2i).y)
+						ring1_slots[si].x,
+						ring1_slots[si].y)
 				# Dot product of tangent offset with the slot's expected direction.
 				# pv.x is negated in _axial_to_pixel (east = screen-left), so negate
 				# it back to get the tangent-space direction vector.
@@ -168,31 +205,31 @@ func _build_region(
 					best_score = score
 					best_ci = ci
 					best_si = si
-		var nb: int = ring1_candidates[best_ci] as int
-		var slot: Vector2i = ring1_slots[best_si] as Vector2i
+		var nb: int = ring1_candidates[best_ci]
+		var slot: Vector2i = ring1_slots[best_si]
 		axial[nb] = slot
 		claimed[slot] = true
 		ring1_candidates.remove_at(best_ci)
 		ring1_slots.remove_at(best_si)
 
 	# --- Ring-2+: sorted-dirs BFS from ring-1 anchors ---
-	var frontier: Array = []
+	var frontier: Array[int] = []
 	for idx: int in axial:
 		if idx != center_idx:
 			frontier.append(idx)
 	for ring: int in range(2, rings + 1):
-		var next_frontier: Array = []
+		var next_frontier: Array[int] = []
 		for idx: int in frontier:
 			var parent_coord: Vector2i = axial[idx] as Vector2i
-			var from_pos: Vector3 = (cells[idx] as Dictionary)["position"] as Vector3
-			for nb: int in (all_neighbors[idx] as Array):
+			var from_pos: Vector3 = cells[idx]["position"] as Vector3
+			for nb: int in all_neighbors[idx]:
 				if axial.has(nb):
 					continue
-				var to_pos: Vector3 = (cells[nb] as Dictionary)["position"] as Vector3
+				var to_pos: Vector3 = cells[nb]["position"] as Vector3
 				var dx: float = to_pos.dot(e1) - from_pos.dot(e1)
 				var dy: float = to_pos.dot(e2) - from_pos.dot(e2)
 				for dir_idx: int in _sorted_hex_dirs(dx, dy):
-					var coord: Vector2i = parent_coord + (HEX_DIRS[dir_idx] as Vector2i)
+					var coord: Vector2i = parent_coord + HEX_DIRS[dir_idx]
 					var dist: int = (abs(coord.x) + abs(coord.y) + abs(coord.x + coord.y)) / 2
 					if dist != ring:
 						continue
@@ -206,9 +243,9 @@ func _build_region(
 
 	# Build region; deduplicate by coord in case two same-ring cells collide.
 	var used_coords: Dictionary = {}
-	var region: Array = []
+	var region: Array[Dictionary] = []
 	for idx: int in axial:
-		var cell: Dictionary = cells[idx] as Dictionary
+		var cell: Dictionary = cells[idx]
 		var coord: Vector2i = axial[idx] as Vector2i
 		if used_coords.has(coord):
 			continue
@@ -221,6 +258,7 @@ func _build_region(
 			"is_center": idx == center_idx,
 			"is_occupied": occupied.has(idx),
 			"pentagon": cell["pentagon"] as bool,
+			"biome": cell.get("biome", -1) as int,
 		})
 
 	# --- Gap filling ---
@@ -237,7 +275,7 @@ func _build_region(
 		var coord: Vector2i = axial[idx] as Vector2i
 		if (abs(coord.x) + abs(coord.y) + abs(coord.x + coord.y)) / 2 != 1:
 			continue
-		var cp: Vector3 = (cells[idx] as Dictionary)["position"] as Vector3
+		var cp: Vector3 = cells[idx]["position"] as Vector3
 		var t_len: float = Vector2(cp.dot(e1), cp.dot(e2)).length()
 		var p_len: float = _axial_to_pixel(coord.x, coord.y).length()
 		if p_len > 0.0 and t_len > 0.0:
@@ -251,7 +289,7 @@ func _build_region(
 	var halo: Dictionary = {}
 	for idx: int in axial:
 		halo[idx] = true
-		for nb: int in (all_neighbors[idx] as Array):
+		for nb: int in all_neighbors[idx]:
 			halo[nb] = true
 
 	# Fill any expected position not yet covered.
@@ -272,13 +310,13 @@ func _build_region(
 			var best_sq: float = INF
 			var best_cell: Dictionary = {}
 			for ci: int in halo:
-				var cp: Vector3 = (cells[ci] as Dictionary)["position"] as Vector3
+				var cp: Vector3 = cells[ci]["position"] as Vector3
 				var dx: float = cp.dot(e1) - target_e1
 				var dy: float = cp.dot(e2) - target_e2
 				var sq: float = dx * dx + dy * dy
 				if sq < best_sq:
 					best_sq = sq
-					best_cell = cells[ci] as Dictionary
+					best_cell = cells[ci]
 			if best_cell.is_empty():
 				continue
 			used_coords[coord] = true
@@ -290,6 +328,7 @@ func _build_region(
 				"is_center": false,
 				"is_occupied": false,
 				"pentagon": best_cell["pentagon"] as bool,
+				"biome": best_cell.get("biome", -1) as int,
 			})
 
 	return region
@@ -316,26 +355,25 @@ func _hex_corners(center: Vector2) -> PackedVector2Array:
 
 
 func _cell_description(cell: Dictionary) -> String:
+	var biome: int = cell.get("biome", -1) as int
+	var name: String = HexPlanet.biome_name(biome)
+	if not name.is_empty():
+		return name
+	# Fallback for cells with biome == -1 (before pass 2 runs, e.g. editor preview).
 	var is_ocean: bool = (cell["type"] as int) == 0
 	var h: float = cell["height"] as float
 	if is_ocean:
 		return "Ocean — %s" % ("deep" if h < -0.3 else "shallow")
 	var t: float = clamp((h - _land_threshold) / max(1.0 - _land_threshold, 0.001), 0.0, 1.0)
-	var label: String
-	if t < 0.15:
-		label = "coast"
-	elif t < 0.4:
-		label = "lowland"
-	elif t < 0.7:
-		label = "highland"
-	else:
-		label = "mountain"
-	return "Land — %s" % label
+	if t < 0.15: return "Land — coast"
+	elif t < 0.4: return "Land — lowland"
+	elif t < 0.7: return "Land — highland"
+	return "Land — mountain"
 
 
 # Returns all six direction indices sorted from best to worst match for (dx, dy).
 # Used by the BFS to fall back to the next-best direction when the best is taken.
-static func _sorted_hex_dirs(dx: float, dy: float) -> Array:
+static func _sorted_hex_dirs(dx: float, dy: float) -> Array[int]:
 	var dots: Array[float] = [
 		dx * 0.866025 + dy * 0.5,
 		dx * 0.866025 - dy * 0.5,
@@ -344,6 +382,6 @@ static func _sorted_hex_dirs(dx: float, dy: float) -> Array:
 		-dx * 0.866025 + dy * 0.5,
 		dy,
 	]
-	var order: Array = [0, 1, 2, 3, 4, 5]
+	var order: Array[int] = [0, 1, 2, 3, 4, 5]
 	order.sort_custom(func(a: int, b: int) -> bool: return dots[a] > dots[b])
 	return order
