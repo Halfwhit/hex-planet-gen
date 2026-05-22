@@ -417,10 +417,9 @@ func _build_tectonic_heights(
 	# Bellman-Ford style: each pass lets the strongest reachable effect win
 	# from any direction, so mountain ranges extend naturally on both sides of
 	# a collision zone with no single-direction blocking artefacts.
-	# DECAY 0.82 gives ~4-6 cells of mountain from a typical collision,
-	# scaling up to ~7 for very high convergence.  Higher values (0.86+)
-	# produced bands 10+ cells wide on strong-convergence seeds.
-	const DECAY: float = 0.82
+	# DECAY 0.76: faster falloff keeps mountain bands 2-3 cells wide for
+	# typical convergence, up to ~4 for strong seeds.
+	const DECAY: float = 0.76
 	const MAX_HOPS: int = 22
 
 	var propagated: Array[float] = boundary_effect.duplicate()
@@ -516,8 +515,8 @@ static func _classify_biome(
 		return BIOME_BOREAL_FOREST if moisture > 0.42 else BIOME_TUNDRA
 
 	# Coastal beach — warm, low-lying, ocean-adjacent.
-	# Tight altitude cap keeps beaches as a narrow strip right at the waterline.
-	var coastal: bool = near_ocean and alt < 0.02
+	# alt < 0.01 keeps beach to only the very lowest coastal cells.
+	var coastal: bool = near_ocean and alt < 0.01
 
 	# Temperate zone.
 	if temperature < 0.60:
@@ -532,15 +531,15 @@ static func _classify_biome(
 		return BIOME_SHRUBLAND
 
 	# Hot zone.
-	# Thresholds matched to the moisture distribution (base 0.44 ± ~0.24):
-	#   rainforest ~13 %  savanna ~35 %  shrubland ~31 %  desert ~21 %
+	# Thresholds shifted up so moisture clusters near base_m=0.44 hit
+	# shrubland/desert more than savanna.
 	if coastal:
 		return BIOME_BEACH
 	if moisture > 0.62:
 		return BIOME_TROPICAL_RAINFOREST
-	if moisture > 0.45:
+	if moisture > 0.52:
 		return BIOME_SAVANNA
-	if moisture > 0.30:
+	if moisture > 0.38:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
