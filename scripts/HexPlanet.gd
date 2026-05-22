@@ -541,11 +541,11 @@ static func _classify_biome(
 	# noise spread hits all four biomes in proportion.
 	if coastal:
 		return BIOME_BEACH
-	if moisture > 0.46:
+	if moisture > 0.43:
 		return BIOME_TROPICAL_RAINFOREST
 	if moisture > 0.38:
 		return BIOME_SAVANNA
-	if moisture > 0.30:
+	if moisture > 0.34:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
