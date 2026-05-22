@@ -2,6 +2,9 @@ class_name PlanetMesh
 extends RefCounted
 
 
+## Build and return an ArrayMesh for the given HexPlanet at the specified radius.
+## Pass highlight_pentagons = true to colour the 12 pentagon tiles in magenta.
+## Pass debug_plates = true to colour cells by tectonic plate instead of biome.
 static func build(planet: HexPlanet, radius: float, highlight_pentagons: bool = false, debug_plates: bool = false) -> ArrayMesh:
 	var st: SurfaceTool = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)

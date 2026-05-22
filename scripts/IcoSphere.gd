@@ -7,6 +7,7 @@ var faces: Array[Array] = []
 var vertices: PackedVector3Array
 
 
+## Build an icosphere with the given number of subdivision passes (0 = plain icosahedron).
 func generate(subdivisions: int) -> void:
 	vertices = PackedVector3Array()
 	faces = []

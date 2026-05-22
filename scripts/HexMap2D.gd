@@ -12,7 +12,7 @@ const HEADER_H: float = 44.0
 
 ## Slot order matching LocalMap.HEX_DIRS / ring1_slots exactly.
 ## Index i here corresponds to index i in the border_data array from LocalMap.get_ring1_data().
-const EDGE_SLOTS: Array = [
+const EDGE_SLOTS: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1),
 	Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1),
 ]
@@ -21,7 +21,7 @@ const EDGE_SLOTS: Array = [
 @export var border_color: Color = Color(0.0, 0.0, 0.0, 0.25)
 @export var grid_line_width: float = 0.8
 
-var _tiles: Array = []
+var _tiles: Array[Dictionary] = []
 var _land_threshold: float = 0.0
 var _title_label: Label
 var _close_btn: Button
@@ -104,7 +104,7 @@ func _generate_tiles(
 		center_moisture: float,
 		border_data: Array,
 		noise_seed: int,
-) -> Array:
+) -> Array[Dictionary]:
 	# Ocean / land boundary noise.
 	var onoise: FastNoiseLite = FastNoiseLite.new()
 	onoise.seed = noise_seed
@@ -126,7 +126,7 @@ func _generate_tiles(
 
 	var center_ocean: float = 1.0 if center_type == HexPlanet.OCEAN else 0.0
 
-	var tiles: Array = []
+	var tiles: Array[Dictionary] = []
 	for q: int in range(-MAP_RADIUS, MAP_RADIUS + 1):
 		for r: int in range(-MAP_RADIUS, MAP_RADIUS + 1):
 			var dist: int = (abs(q) + abs(r) + abs(q + r)) / 2
@@ -150,8 +150,8 @@ func _generate_tiles(
 				var tile_len: float = sqrt(px * px + py * py)
 
 				for i: int in EDGE_SLOTS.size():
-					var dq: int = (EDGE_SLOTS[i] as Vector2i).x
-					var dr: int = (EDGE_SLOTS[i] as Vector2i).y
+					var dq: int = EDGE_SLOTS[i].x
+					var dr: int = EDGE_SLOTS[i].y
 					var dpx: float = -1.5 * float(dq)
 					var dpy: float = SQRT3 * (float(dr) + float(dq) * 0.5)
 					var slot_len: float = sqrt(dpx * dpx + dpy * dpy)

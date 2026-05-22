@@ -38,8 +38,11 @@ const BIOME_LAKE: int = 18
 ##   position, polygon, height, type, pentagon,
 ##   temperature, moisture, biome, plate_id, plate_oceanic
 var cells: Array[Dictionary] = []
+## Height value at which ocean/land boundary is placed; set by generate().
 var land_threshold: float = 0.0
+## Noise frequency scale passed to generate(); retained for debug display.
 var noise_scale: float = 1.0
+## Number of tectonic plates used in the last generate() call.
 var num_plates: int = 0
 
 # Tectonic data retained after generation for debug visualisation.
@@ -330,8 +333,8 @@ func _build_tectonic_heights(
 	warp.frequency = 1.4
 	warp.fractal_octaves = 2
 	# Fixed spatial offsets ensure the three components are uncorrelated.
-	var WO1: Vector3 = Vector3(31.4, 17.3, 83.7)
-	var WO2: Vector3 = Vector3(57.1, 91.2, 23.5)
+	const WO1: Vector3 = Vector3(31.4, 17.3, 83.7)
+	const WO2: Vector3 = Vector3(57.1, 91.2, 23.5)
 
 	# ── 3. Assign every vertex to its nearest plate (via warped position) ────
 	var cell_plate: Array[int] = []
@@ -540,8 +543,8 @@ static func _classify_biome(
 	return BIOME_DESERT
 
 
-# Returns polygon corners in counter-clockwise order when viewed from outside
-# the sphere — required for correct front-face winding in PlanetMesh.build().
+## Returns polygon corners in counter-clockwise order when viewed from outside
+## the sphere — required for correct front-face winding in PlanetMesh.build().
 func _sort_around(center: Vector3, points: Array[Vector3]) -> PackedVector3Array:
 	var ref: Vector3 = Vector3.UP if abs(center.dot(Vector3.UP)) < 0.9 else Vector3.RIGHT
 	var tangent: Vector3 = center.cross(ref).normalized()

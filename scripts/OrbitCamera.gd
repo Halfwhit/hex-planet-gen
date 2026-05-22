@@ -77,10 +77,12 @@ func set_north(north: Vector3) -> void:
 	_north = north
 
 
+## Returns the current camera distance from the orbit centre.
 func get_distance() -> float:
 	return _distance
 
 
+## Set pitch and yaw directly; pitch is clamped to ±max_pitch.
 func set_angles(pitch: float, yaw: float) -> void:
 	_pitch = clamp(pitch, -max_pitch, max_pitch)
 	_yaw = yaw
@@ -88,6 +90,7 @@ func set_angles(pitch: float, yaw: float) -> void:
 	_angles_dirty = true
 
 
+## Drive pitch and yaw from a world-space direction vector (e.g. a selected tile position).
 func set_angles_from_dir(dir: Vector3) -> void:
 	# Treat external angle driving as "activity" so idle orbit never fights
 	# with a tile-locked camera.  Main._process runs before OrbitCamera._process,
@@ -97,6 +100,7 @@ func set_angles_from_dir(dir: Vector3) -> void:
 	set_angles(-asin(clamp(dir.y, -1.0, 1.0)), atan2(dir.x, dir.z))
 
 
+## Update min/max zoom distance and clamp the current distance into range.
 func set_distance_limits(p_min: float, p_max: float) -> void:
 	min_distance = p_min
 	max_distance = p_max
