@@ -242,16 +242,16 @@ func generate(
 		# mid-latitude moderate → polar dry.
 		var base_m: float
 		if lat < 0.15:
-			base_m = 0.44
+			base_m = 0.32
 		elif lat < 0.35:
-			base_m = lerpf(0.44, 0.20, (lat - 0.15) / 0.20)
+			base_m = lerpf(0.32, 0.16, (lat - 0.15) / 0.20)
 		elif lat < 0.60:
-			base_m = lerpf(0.20, 0.50, (lat - 0.35) / 0.25)
+			base_m = lerpf(0.16, 0.46, (lat - 0.35) / 0.25)
 		else:
-			base_m = lerpf(0.50, 0.10, (lat - 0.60) / 0.40)
+			base_m = lerpf(0.46, 0.10, (lat - 0.60) / 0.40)
 
 		# Coastal cells receive additional moisture from the nearby ocean.
-		var ocean_boost: float = 0.22 if near_ocean else 0.0
+		var ocean_boost: float = 0.10 if near_ocean else 0.0
 		# Mountains cause a rain shadow on their upper slopes.
 		var mtn_shadow: float = max(0.0, alt - 0.55) * 0.65
 		var m_var: float = m_noise.get_noise_3dv(pos * p_noise_scale * 0.8) * 0.28
@@ -531,15 +531,16 @@ static func _classify_biome(
 		return BIOME_SHRUBLAND
 
 	# Hot zone.
-	# Thresholds shifted up so moisture clusters near base_m=0.44 hit
-	# shrubland/desert more than savanna.
+	# base_m is now 0.32 with noise ±~0.24, so effective range ≈ 0.08–0.56.
+	# Thresholds placed at roughly equal intervals across that range so the
+	# noise spread hits all four biomes in proportion.
 	if coastal:
 		return BIOME_BEACH
-	if moisture > 0.62:
-		return BIOME_TROPICAL_RAINFOREST
 	if moisture > 0.52:
-		return BIOME_SAVANNA
+		return BIOME_TROPICAL_RAINFOREST
 	if moisture > 0.38:
+		return BIOME_SAVANNA
+	if moisture > 0.24:
 		return BIOME_SHRUBLAND
 	return BIOME_DESERT
 
