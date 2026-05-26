@@ -19,8 +19,15 @@ extends Node3D
 @export var sun_light_range: float = 40.0
 
 var _angle: float = 0.0
+var _planet_position: Vector3 = Vector3.ZERO
 var _light: OmniLight3D
 var _mesh_instance: MeshInstance3D
+
+
+## Returns the current world-space position where the planet should sit.
+## Main.gd reads this each frame and moves the planet pivot there.
+func get_planet_position() -> Vector3:
+	return _planet_position
 
 
 func _ready() -> void:
@@ -72,8 +79,9 @@ func _process(delta: float) -> void:
 
 
 func _update_position() -> void:
-	# Orbit circle in the flat X/Y plane, then tilt around the X axis by sun_inclination.
+	# Compute where the planet should be: orbiting the sun (which sits at
+	# world origin).  The sun node does not move — only the planet pivot does.
 	var flat_x: float = cos(_angle) * sun_distance
 	var flat_y: float = sin(_angle) * sun_distance
 	var tilt: float = deg_to_rad(sun_inclination)
-	global_position = Vector3(flat_x, flat_y * cos(tilt), flat_y * sin(tilt))
+	_planet_position = Vector3(flat_x, flat_y * cos(tilt), flat_y * sin(tilt))

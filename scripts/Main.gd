@@ -70,6 +70,7 @@ var _gen_btn: Callable = _editor_generate
 ## Colour cells by tectonic plate instead of biome (bright = continental, dark = oceanic).
 @export var debug_plates: bool = false
 
+var _planet_pivot: Node3D = null
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
 var _lod_cells: Array = []
@@ -92,6 +93,17 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	_rotation_speed_rad = deg_to_rad(rotation_speed)
+
+	# All planet visuals (mesh, atmosphere, axis lines) are children of this
+	# pivot so that a single position update moves everything in sync.
+	_planet_pivot = Node3D.new()
+	_planet_pivot.name = "PlanetPivot"
+	add_child(_planet_pivot)
+	_planet_mesh_instance.reparent(_planet_pivot, false)
+	_planet_mesh_instance.position = Vector3.ZERO
+	_orbit_camera.reparent(_planet_pivot, false)
+	_orbit_camera.position = Vector3.ZERO
+
 	# Pre-tilt the planet mesh so its local Y axis (= the planet's north pole)
 	# points in the intended world-space direction.  All subsequent behaviour —
 	# camera north lock, lighting — reads this axis directly from the mesh
@@ -140,6 +152,10 @@ func _process(delta: float) -> void:
 	if _locking:
 		_orbit_camera.set_angles_from_dir((planet_basis * _lock_cell_local).normalized())
 
+	# Move the planet pivot to orbit the sun.
+	if _planet_pivot != null and has_node("Sun"):
+		_planet_pivot.global_position = ($Sun as Sun).get_planet_position()
+
 
 func _editor_generate() -> void:
 	if not Engine.is_editor_hint():
@@ -154,7 +170,7 @@ func _editor_generate() -> void:
 	_planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons, debug_plates)
 
 	for child_name: String in ["HorizonMask", "Atmosphere", "RotationAxis", "TrueNorthAxis"]:
-		var old: Node = get_node_or_null(child_name)
+		var old: Node = _planet_pivot.get_node_or_null(child_name) if _planet_pivot else get_node_or_null(child_name)
 		if old:
 			old.free()
 	_create_atmosphere()
@@ -233,7 +249,7 @@ func _make_sphere_layer(
 	mi.name = layer_name
 	mi.mesh = sphere
 	mi.material_override = mat
-	add_child(mi)
+	_planet_pivot.add_child(mi)
 
 
 func _create_atmosphere() -> void:
@@ -291,7 +307,7 @@ func _add_axis_line(
 	mi.mesh = cyl
 	mi.material_override = mat
 	mi.rotation_degrees = rotation_deg
-	add_child(mi)
+	_planet_pivot.add_child(mi)
 
 
 func _cam_up_local() -> Vector3:
