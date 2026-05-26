@@ -90,4 +90,4 @@ func _update_position() -> void:
 	# Point the directional light from the sun toward the planet so the lit
 	# hemisphere always faces the sun correctly.
 	if _light != null and _planet_position != Vector3.ZERO:
-		_light.look_at(_planet_position, Vector3.UP)
+		_light.look_at(-_planet_position, Vector3.UP)
