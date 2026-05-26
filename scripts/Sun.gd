@@ -89,12 +89,12 @@ func _update_position() -> void:
 
 	# Orient the directional light so it shines from the sun toward the planet.
 	# DirectionalLight3D shines along its local -Z axis; we want -Z = d where
-	# d is the unit vector sun → planet.  look_at() picks up the planet axial
-	# tilt via its up vector, so we derive pitch/yaw directly instead:
-	#   basis.z = -d  →  pitch = -asin(d.y),  yaw = atan2(-d.x, -d.z)
+	# d is the unit vector sun → planet.  We build the basis directly rather
+	# than using look_at() or Euler angles to avoid any axis/order ambiguity.
 	if _light != null and _planet_position != Vector3.ZERO:
 		var d: Vector3 = _planet_position.normalized()
-		_light.rotation = Vector3(
-				-asin(clamp(d.y, -1.0, 1.0)),
-				atan2(-d.x, -d.z),
-				0.0)
+		var up: Vector3 = Vector3.UP if abs(d.dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
+		var right: Vector3 = up.cross(d).normalized()
+		var true_up: Vector3 = d.cross(right).normalized()
+		# Basis(x, y, z): x=right, y=up, z=back. back = -d so that -Z = d.
+		_light.global_transform = Transform3D(Basis(right, true_up, -d), Vector3.ZERO)
