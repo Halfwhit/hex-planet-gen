@@ -87,14 +87,9 @@ func _update_position() -> void:
 	var tilt: float = deg_to_rad(sun_inclination)
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
 
-	# Orient the directional light so it shines from the sun toward the planet.
-	# DirectionalLight3D shines along its local -Z axis; we want -Z = d where
-	# d is the unit vector sun → planet.  We build the basis directly rather
-	# than using look_at() or Euler angles to avoid any axis/order ambiguity.
+	# Orient the directional light to shine from the sun toward the planet.
+	# look_at makes the node's -Z face the target, and DirectionalLight3D
+	# shines along -Z, so look_at(_planet_position) points the beam correctly.
 	if _light != null and _planet_position != Vector3.ZERO:
-		var d: Vector3 = _planet_position.normalized()
-		var up: Vector3 = Vector3.UP if abs(d.dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
-		var right: Vector3 = up.cross(d).normalized()
-		var true_up: Vector3 = d.cross(right).normalized()
-		# Basis(x, y, z): x=right, y=up, z=back. back = -d so that -Z = d.
-		_light.global_transform = Transform3D(Basis(right, true_up, -d), Vector3.ZERO)
+		var up: Vector3 = Vector3.UP if abs(_planet_position.normalized().dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
+		_light.look_at(_planet_position, up)
