@@ -42,8 +42,10 @@ const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
 @export_group("Rotation")
 ## Tilt of the planet's spin axis in degrees relative to world Y.
 @export var axial_tilt: float = 23.5
-## Planet spin speed in degrees per second.
+## Planet spin speed in degrees per second (used only when no Sun node is present).
 @export var rotation_speed: float = 4.0
+## Number of planet rotations per full orbit around the sun.
+@export var days_per_orbit: int = 8
 
 @export_group("Occupation")
 ## Number of rings shown in the local map AND the minimum spacing between
@@ -71,6 +73,7 @@ var _gen_btn: Callable = _editor_generate
 @export var debug_plates: bool = false
 
 var _planet_pivot: Node3D = null
+var _sun: Sun = null
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
 var _lod_cells: Array = []
@@ -92,7 +95,11 @@ var _local_map: LocalMap = null
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
-	_rotation_speed_rad = deg_to_rad(rotation_speed)
+	_sun = get_node_or_null("Sun") as Sun
+	if _sun:
+		_rotation_speed_rad = deg_to_rad(_sun.sun_orbit_speed * float(days_per_orbit))
+	else:
+		_rotation_speed_rad = deg_to_rad(rotation_speed)
 
 	# All planet visuals (mesh, atmosphere, axis lines) are children of this
 	# pivot so that a single position update moves everything in sync.
@@ -105,9 +112,8 @@ func _ready() -> void:
 	_orbit_camera.position = Vector3.ZERO
 	# Set initial pivot position so the planet starts at orbital distance
 	# rather than at the sun's position (world origin).
-	var sun_node: Sun = get_node_or_null("Sun") as Sun
-	if sun_node:
-		_planet_pivot.position = sun_node.get_planet_position()
+	if _sun != null:
+		_planet_pivot.position = _sun.get_planet_position()
 
 	# Pre-tilt the planet mesh so its local Y axis (= the planet's north pole)
 	# points in the intended world-space direction.  All subsequent behaviour —
@@ -158,10 +164,8 @@ func _process(delta: float) -> void:
 		_orbit_camera.set_angles_from_dir((planet_basis * _lock_cell_local).normalized())
 
 	# Move the planet pivot to orbit the sun.
-	if _planet_pivot != null:
-		var sun_node: Sun = get_node_or_null("Sun") as Sun
-		if sun_node:
-			_planet_pivot.position = sun_node.get_planet_position()
+	if _planet_pivot != null and _sun != null:
+		_planet_pivot.position = _sun.get_planet_position()
 
 
 func _editor_generate() -> void:
