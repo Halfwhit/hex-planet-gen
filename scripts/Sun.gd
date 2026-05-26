@@ -13,12 +13,14 @@ extends Node3D
 @export var sun_color: Color = Color(1.0, 0.92, 0.6, 1.0)
 ## Radius of the visible sun sphere in world units.
 @export var sun_size: float = 0.35
-## DirectionalLight3D brightness.
+## OmniLight3D brightness.
 @export var sun_light_energy: float = 28.0
+## OmniLight3D range — must exceed orbital distance.
+@export var sun_light_range: float = 200.0
 
 var _angle: float = 0.0
 var _planet_position: Vector3 = Vector3.ZERO
-var _light: DirectionalLight3D
+var _light: OmniLight3D
 var _mesh_instance: MeshInstance3D
 
 
@@ -60,13 +62,15 @@ func _build_sun() -> void:
 	add_child(_mesh_instance)
 
 	# ── Light ────────────────────────────────────────────────────────────────
-	# DirectionalLight3D gives parallel rays with no distance attenuation —
-	# correct for a star and avoids the cubemap shadow artifacts of OmniLight.
-	_light = DirectionalLight3D.new()
+	# OmniLight3D at the sun's position naturally illuminates the correct
+	# hemisphere with no rotation needed.  Shadows disabled to avoid the
+	# cubemap shadow artifacts that are visible when zoomed in close.
+	_light = OmniLight3D.new()
 	_light.name = "SunLight"
 	_light.light_color = sun_color
 	_light.light_energy = sun_light_energy
-	_light.shadow_enabled = true
+	_light.omni_range = sun_light_range
+	_light.shadow_enabled = false
 	add_child(_light)
 
 	_update_position()
@@ -87,14 +91,3 @@ func _update_position() -> void:
 	var tilt: float = deg_to_rad(sun_inclination)
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
 
-	# Orient the directional light to shine from the sun toward the planet.
-	# Derive global Euler angles directly from the direction vector — avoids
-	# all look_at / up-vector ambiguity.
-	# With YXZ rotation order, -Z after Ry(yaw)*Rx(pitch) = (-sin(yaw)*cos(pitch), sin(pitch), -cos(yaw)*cos(pitch))
-	# Setting that equal to d gives: pitch = asin(d.y), yaw = atan2(-d.x, -d.z).
-	if _light != null and _planet_position != Vector3.ZERO:
-		var d: Vector3 = _planet_position.normalized()
-		_light.global_rotation = Vector3(
-				asin(clamp(d.y, -1.0, 1.0)),
-				atan2(-d.x, -d.z),
-				0.0)
