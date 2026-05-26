@@ -88,8 +88,13 @@ func _update_position() -> void:
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
 
 	# Orient the directional light to shine from the sun toward the planet.
-	# look_at makes the node's -Z face the target, and DirectionalLight3D
-	# shines along -Z, so look_at(_planet_position) points the beam correctly.
+	# Derive global Euler angles directly from the direction vector — avoids
+	# all look_at / up-vector ambiguity.
+	# With YXZ rotation order, -Z after Ry(yaw)*Rx(pitch) = (-sin(yaw)*cos(pitch), sin(pitch), -cos(yaw)*cos(pitch))
+	# Setting that equal to d gives: pitch = asin(d.y), yaw = atan2(-d.x, -d.z).
 	if _light != null and _planet_position != Vector3.ZERO:
-		var up: Vector3 = Vector3.UP if abs(_planet_position.normalized().dot(Vector3.UP)) < 0.99 else Vector3.FORWARD
-		_light.look_at(_planet_position, up)
+		var d: Vector3 = _planet_position.normalized()
+		_light.global_rotation = Vector3(
+				asin(clamp(d.y, -1.0, 1.0)),
+				atan2(-d.x, -d.z),
+				0.0)
