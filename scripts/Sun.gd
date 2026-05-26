@@ -7,8 +7,8 @@ extends Node3D
 @export var sun_distance: float = 10.0
 ## Orbit speed in degrees per second (positive = counter-clockwise viewed from above).
 @export var sun_orbit_speed: float = 3.0
-## Tilt of the orbital plane in degrees (0 = orbits in world X/Y, 23.5 = Earth-like).
-@export var sun_inclination: float = 15.0
+## Tilt of the orbital plane in degrees (0 = perfectly horizontal X/Z, 23.5 = Earth-like).
+@export var sun_inclination: float = 0.0
 ## Colour of the sun light and emissive sphere.
 @export var sun_color: Color = Color(1.0, 0.92, 0.6, 1.0)
 ## Radius of the visible sun sphere in world units.

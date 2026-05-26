@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://gbcld8g2bs4y" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://d3c1h5takgjoq" path="res://scripts/OrbitCamera.gd" id="2_orbit"]
 [ext_resource type="Script" uid="uid://du1nqbmwh52vn" path="res://scripts/PlanetGridmap.gd" id="3_0bbpv"]
-[ext_resource type="Script" path="res://scripts/Sun.gd" id="4_rarhs"]
+[ext_resource type="Script" uid="uid://cis3s82hapwwc" path="res://scripts/Sun.gd" id="4_rarhs"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0bbpv"]
 vertex_color_use_as_albedo = true
@@ -61,4 +61,6 @@ text = "LOD 0"
 script = ExtResource("3_0bbpv")
 
 [node name="Sun" type="Node3D" parent="." unique_id=1865632631]
+transform = Transform3D(1, 2.7939677e-08, 0, 2.7939677e-08, 1, 0, -7.450581e-09, 0, 1, 5.4923205, 8.249365, -1.3350644)
 script = ExtResource("4_rarhs")
+sun_inclination = 0.0
