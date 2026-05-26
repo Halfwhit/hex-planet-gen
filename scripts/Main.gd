@@ -99,6 +99,10 @@ func _ready() -> void:
 	_planet_pivot = Node3D.new()
 	_planet_pivot.name = "PlanetPivot"
 	add_child(_planet_pivot)
+	# Set initial position before any children are reparented so the planet
+	# never occupies the same space as the sun (which sits at world origin).
+	if has_node("Sun"):
+		_planet_pivot.global_position = ($Sun as Sun).get_planet_position()
 	_planet_mesh_instance.reparent(_planet_pivot, false)
 	_planet_mesh_instance.position = Vector3.ZERO
 	_orbit_camera.reparent(_planet_pivot, false)
