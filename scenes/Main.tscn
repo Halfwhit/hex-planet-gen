@@ -65,4 +65,5 @@ transform = Transform3D(1, 2.7939677e-08, 0, 2.7939677e-08, 1, 0, -7.450581e-09,
 script = ExtResource("4_rarhs")
 sun_distance = 80.0
 sun_size = 8.0
-sun_light_range = 250.0
+sun_light_energy = 8.0
+sun_light_range = 200.0
