@@ -95,11 +95,10 @@ var _local_map: LocalMap = null
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
+	_rotation_speed_rad = deg_to_rad(rotation_speed)
 	_sun = get_node_or_null("Sun") as Sun
 	if _sun:
-		_rotation_speed_rad = deg_to_rad(_sun.sun_orbit_speed * float(days_per_orbit))
-	else:
-		_rotation_speed_rad = deg_to_rad(rotation_speed)
+		_sun.sun_orbit_speed = rotation_speed / float(days_per_orbit)
 
 	# All planet visuals (mesh, atmosphere, axis lines) are children of this
 	# pivot so that a single position update moves everything in sync.
