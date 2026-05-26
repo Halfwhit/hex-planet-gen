@@ -84,4 +84,4 @@ func _update_position() -> void:
 	var flat_x: float = cos(_angle) * sun_distance
 	var flat_y: float = sin(_angle) * sun_distance
 	var tilt: float = deg_to_rad(sun_inclination)
-	_planet_position = Vector3(flat_x, flat_y * cos(tilt), flat_y * sin(tilt))
+	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
