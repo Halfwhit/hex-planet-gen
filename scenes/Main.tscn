@@ -63,3 +63,6 @@ script = ExtResource("3_0bbpv")
 [node name="Sun" type="Node3D" parent="." unique_id=1865632631]
 transform = Transform3D(1, 2.7939677e-08, 0, 2.7939677e-08, 1, 0, -7.450581e-09, 0, 1, 0, 0, 0)
 script = ExtResource("4_rarhs")
+sun_distance = 30.0
+sun_size = 2.5
+sun_light_range = 100.0
