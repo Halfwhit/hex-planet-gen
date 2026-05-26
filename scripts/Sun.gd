@@ -14,7 +14,7 @@ extends Node3D
 ## Radius of the visible sun sphere in world units.
 @export var sun_size: float = 0.35
 ## OmniLight3D brightness.
-@export var sun_light_energy: float = 28.0
+@export var sun_light_energy: float = 50.0
 ## OmniLight3D range — must exceed orbital distance.
 @export var sun_light_range: float = 200.0
 
@@ -90,4 +90,3 @@ func _update_position() -> void:
 	var flat_y: float = sin(_angle) * sun_distance
 	var tilt: float = deg_to_rad(sun_inclination)
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
-
