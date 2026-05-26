@@ -44,8 +44,8 @@ const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
 @export var axial_tilt: float = 23.5
 ## Planet spin speed in degrees per second (used only when no Sun node is present).
 @export var rotation_speed: float = 4.0
-## Number of planet rotations per full orbit around the sun.
-@export var days_per_orbit: int = 8
+## Number of planet rotations (days) per full orbit (year).
+@export var days_per_orbit: int = 100
 
 @export_group("Occupation")
 ## Number of rings shown in the local map AND the minimum spacing between
