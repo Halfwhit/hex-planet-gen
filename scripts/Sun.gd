@@ -87,7 +87,14 @@ func _update_position() -> void:
 	var tilt: float = deg_to_rad(sun_inclination)
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
 
-	# Point the directional light from the sun toward the planet so the lit
-	# hemisphere always faces the sun correctly.
+	# Orient the directional light so it shines from the sun toward the planet.
+	# DirectionalLight3D shines along its local -Z axis; we want -Z = d where
+	# d is the unit vector sun → planet.  look_at() picks up the planet axial
+	# tilt via its up vector, so we derive pitch/yaw directly instead:
+	#   basis.z = -d  →  pitch = -asin(d.y),  yaw = atan2(-d.x, -d.z)
 	if _light != null and _planet_position != Vector3.ZERO:
-		_light.look_at(-_planet_position, Vector3.UP)
+		var d: Vector3 = _planet_position.normalized()
+		_light.rotation = Vector3(
+				-asin(clamp(d.y, -1.0, 1.0)),
+				atan2(-d.x, -d.z),
+				0.0)
