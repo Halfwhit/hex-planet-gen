@@ -18,6 +18,7 @@ Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra
 | `LocalMap.gd` | 2D CanvasLayer panel. Shows a flat-top hex minimap of the ring-1 (and optionally ring-N) neighbours around an occupied cell. Orientation is always aligned with the camera view. |
 | `OrbitCamera.gd` | Node3D with Camera3D child. Mouse-drag orbit, scroll zoom, idle auto-orbit, and north-roll correction that keeps orbital north (world Y) at the top of the screen. |
 | `Main.gd` | Scene controller. Owns LOD mesh/cell arrays, planet spin (explicit basis rebuild each frame), atmosphere + axis display, LOD switching, and local-map wiring. `@tool` for in-editor preview. |
+| `Sun.gd` | `@tool` Node3D that manages the emissive sun sphere, OmniLight3D, and orbital position computation. Exposes `get_planet_position()` which Main reads each frame to move `_planet_pivot`. The sun stays at world origin; only the planet pivot moves. |
 | `shaders/HorizonMask.gdshader` | `blend_mix` sphere at 1.025× radius. Covers polygon edges at the silhouette so flat hex tiles don't appear to float past the horizon. |
 | `shaders/Atmosphere.gdshader` | `blend_add` sphere at 1.08× radius. Soft rim glow beyond the planet disc. |
 
@@ -101,6 +102,12 @@ Both `PlanetMesh.build()` and `LocalMap._draw()` call `PlanetMesh.terrain_color(
 
 `planet_gridmap.occupation_radius` and `_local_map.rings` are both set from `Main.map_rings`. This enforces that two occupied cells are always at least `map_rings` hops apart (guaranteeing no overlap in their displayed local maps). Keep these in sync.
 
+### 17. `_planet_pivot` owns all planet visuals; `sun_orbit_speed` is derived
+
+`_planet_pivot` is created in `Main._ready()` and is the parent of all planet visuals (mesh, atmosphere, axis lines, orbit camera). Moving `_planet_pivot` moves everything uniformly. Every frame `Main._process()` calls `_sun.get_planet_position()` and assigns the result to `_planet_pivot.position`, so the planet orbits the stationary sun at world origin.
+
+`_sun.sun_orbit_speed` is set from `rotation_speed / days_per_orbit` so spin and orbit are always proportional — one full orbit takes exactly `days_per_orbit` planet rotations. Do not set `sun_orbit_speed` independently; always derive it via this ratio.
+
 ---
 
 ## Generation pipeline
@@ -121,6 +128,8 @@ Main._generate_planet()
 ```
 
 LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four meshes are held in `_lod_meshes: Array[ArrayMesh]` and the four cell arrays in `_lod_cells: Array` (plain untyped array — see gotcha below). Neither is regenerated at runtime. LOD switch calls `planet_gridmap.setup()` with real cells only at LOD 3 (empty array otherwise) and clears the local map.
+
+`rotation_speed` and `days_per_orbit` together control both spin and orbit. After generation, `Main` sets `_sun.sun_orbit_speed = rotation_speed / days_per_orbit`. The effective orbit rate is therefore **orbit = rotation_speed / days_per_orbit deg/s** — one full orbit equals exactly `days_per_orbit` axial rotations.
 
 ---
 

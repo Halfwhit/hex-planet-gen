@@ -18,6 +18,8 @@ extends Node3D
 ## OmniLight3D range — must exceed orbital distance.
 @export var sun_light_range: float = 200.0
 
+const _EMISSION_ENERGY: float = 6.0
+
 var _angle: float = 0.0
 var _planet_position: Vector3 = Vector3.ZERO
 var _light: OmniLight3D
@@ -34,12 +36,14 @@ func _ready() -> void:
 	_build_sun()
 
 
+## Builds the emissive sphere and OmniLight3D children. Called from _ready() and
+## when the tool script re-runs in the editor.
 func _build_sun() -> void:
 	# The sun stays at world origin — the planet pivot moves, not this node.
 	position = Vector3.ZERO
 	# Clear stale children when the tool script re-runs in the editor.
 	for c: Node in get_children():
-		c.queue_free()
+		c.free()
 
 	# ── Emissive sphere ──────────────────────────────────────────────────────
 	var sphere: SphereMesh = SphereMesh.new()
@@ -52,7 +56,7 @@ func _build_sun() -> void:
 	mat.albedo_color = sun_color
 	mat.emission_enabled = true
 	mat.emission = sun_color
-	mat.emission_energy_multiplier = 6.0
+	mat.emission_energy_multiplier = _EMISSION_ENERGY
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 
 	_mesh_instance = MeshInstance3D.new()
@@ -86,7 +90,9 @@ func _process(delta: float) -> void:
 func _update_position() -> void:
 	# Compute where the planet should be: orbiting the sun (which sits at
 	# world origin).  The sun node does not move — only the planet pivot does.
-	var flat_x: float = cos(_angle) * sun_distance
-	var flat_y: float = sin(_angle) * sun_distance
+	# orbit_r is the radial component that gets distributed into Y/Z by the
+	# inclination tilt.  At inclination=0 it maps entirely to Z (X/Z plane).
+	var orbit_x: float = cos(_angle) * sun_distance
+	var orbit_r: float = sin(_angle) * sun_distance
 	var tilt: float = deg_to_rad(sun_inclination)
-	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
+	_planet_position = Vector3(orbit_x, orbit_r * sin(tilt), orbit_r * cos(tilt))

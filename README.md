@@ -20,6 +20,7 @@ Open `project.godot` in Godot 4 and press **Play** (F5).
 | Click tile (LOD 3 only) | Blue outline selects the tile; camera locks on and tracks it as the planet rotates |
 | Left-drag (while locked) | Unlocks camera and resumes free orbit |
 | **E** on selected tile | Occupy the tile; opens the local-map and 2D minimap panels |
+| — | Sun/orbit happens automatically — the planet orbits the sun at a rate proportional to its spin speed |
 
 ## Inspector properties
 
@@ -57,6 +58,18 @@ All properties are live on the **Main** node.
 |----------|-------------|
 | `rotation_speed` | Degrees per second of axial spin |
 | `axial_tilt` | Degrees the rotation axis is tilted from vertical |
+| `days_per_orbit` | How many full planet rotations make one orbit. Sets `sun_orbit_speed = rotation_speed / days_per_orbit` automatically. |
+
+### Sun
+
+| Property | Description |
+|----------|-------------|
+| `sun_distance` | Distance from the planet centre to the sun in world units |
+| `sun_orbit_speed` | Orbit speed in degrees per second (set automatically from `rotation_speed / days_per_orbit`; do not override manually) |
+| `sun_size` | Radius of the visible sun sphere in world units |
+| `sun_light_energy` | OmniLight3D brightness |
+| `sun_color` | Colour of the sun light and emissive sphere |
+| `sun_inclination` | Tilt of the orbital plane in degrees (0 = flat X/Z plane; 23.5 = Earth-like) |
 
 ### Editor preview
 

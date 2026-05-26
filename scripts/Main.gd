@@ -111,7 +111,7 @@ func _ready() -> void:
 	_orbit_camera.position = Vector3.ZERO
 	# Set initial pivot position so the planet starts at orbital distance
 	# rather than at the sun's position (world origin).
-	if _sun != null:
+	if _sun:
 		_planet_pivot.position = _sun.get_planet_position()
 
 	# Pre-tilt the planet mesh so its local Y axis (= the planet's north pole)
@@ -163,7 +163,7 @@ func _process(delta: float) -> void:
 		_orbit_camera.set_angles_from_dir((planet_basis * _lock_cell_local).normalized())
 
 	# Move the planet pivot to orbit the sun.
-	if _planet_pivot != null and _sun != null:
+	if _sun:
 		_planet_pivot.position = _sun.get_planet_position()
 
 
@@ -180,7 +180,7 @@ func _editor_generate() -> void:
 	_planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons, debug_plates)
 
 	for child_name: String in ["HorizonMask", "Atmosphere", "RotationAxis", "TrueNorthAxis"]:
-		var old: Node = _planet_pivot.get_node_or_null(child_name) if _planet_pivot else get_node_or_null(child_name)
+		var old: Node = _planet_pivot.get_node_or_null(child_name)
 		if old:
 			old.free()
 	_create_atmosphere()
