@@ -42,8 +42,10 @@ const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
 @export_group("Rotation")
 ## Tilt of the planet's spin axis in degrees relative to world Y.
 @export var axial_tilt: float = 23.5
-## Planet spin speed in degrees per second.
+## Planet spin speed in degrees per second (used only when no Sun node is present).
 @export var rotation_speed: float = 4.0
+## Number of planet rotations (days) per full orbit (year).
+@export var days_per_orbit: int = 100
 
 @export_group("Occupation")
 ## Number of rings shown in the local map AND the minimum spacing between
@@ -70,6 +72,8 @@ var _gen_btn: Callable = _editor_generate
 ## Colour cells by tectonic plate instead of biome (bright = continental, dark = oceanic).
 @export var debug_plates: bool = false
 
+var _planet_pivot: Node3D = null
+var _sun: Sun = null
 var _current_lod: int = 0
 var _lod_meshes: Array[ArrayMesh] = []
 var _lod_cells: Array = []
@@ -92,17 +96,32 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
 	_rotation_speed_rad = deg_to_rad(rotation_speed)
+	_sun = get_node_or_null("Sun") as Sun
+	if _sun:
+		_sun.sun_orbit_speed = rotation_speed / float(days_per_orbit)
+
+	# All planet visuals (mesh, atmosphere, axis lines) are children of this
+	# pivot so that a single position update moves everything in sync.
+	_planet_pivot = Node3D.new()
+	_planet_pivot.name = "PlanetPivot"
+	add_child(_planet_pivot)
+	_planet_mesh_instance.reparent(_planet_pivot, false)
+	_planet_mesh_instance.position = Vector3.ZERO
+	_orbit_camera.reparent(_planet_pivot, false)
+	_orbit_camera.position = Vector3.ZERO
+	# Set initial pivot position so the planet starts at orbital distance
+	# rather than at the sun's position (world origin).
+	if _sun:
+		_planet_pivot.position = _sun.get_planet_position()
+
 	# Pre-tilt the planet mesh so its local Y axis (= the planet's north pole)
 	# points in the intended world-space direction.  All subsequent behaviour —
 	# camera north lock, lighting — reads this axis directly from the mesh
 	# rather than keeping a separate _spin_axis variable.
 	_tilt_basis = Basis.from_euler(Vector3(0.0, 0.0, deg_to_rad(-axial_tilt)))
 	_planet_mesh_instance.basis = _tilt_basis
-	# Aim the light from the +Z side, perpendicular to true north (world Y).
-	# look_at_from_position keeps the light at a fixed world position so it
-	# never drifts with the planet's rotation or tilt.
-	$DirectionalLight3D.look_at_from_position(Vector3(0.0, 0.0, 10.0), Vector3.ZERO, Vector3.UP)
 	_generate_planet()
+
 	_create_atmosphere()
 	_create_axis_display()
 	_orbit_camera.set_distance_limits(planet_radius * 1.1, planet_radius * 6.0)
@@ -143,6 +162,10 @@ func _process(delta: float) -> void:
 	if _locking:
 		_orbit_camera.set_angles_from_dir((planet_basis * _lock_cell_local).normalized())
 
+	# Move the planet pivot to orbit the sun.
+	if _sun:
+		_planet_pivot.position = _sun.get_planet_position()
+
 
 func _editor_generate() -> void:
 	if not Engine.is_editor_hint():
@@ -157,7 +180,7 @@ func _editor_generate() -> void:
 	_planet_mesh_instance.mesh = PlanetMesh.build(planet, planet_radius, debug_pentagons, debug_plates)
 
 	for child_name: String in ["HorizonMask", "Atmosphere", "RotationAxis", "TrueNorthAxis"]:
-		var old: Node = get_node_or_null(child_name)
+		var old: Node = _planet_pivot.get_node_or_null(child_name)
 		if old:
 			old.free()
 	_create_atmosphere()
@@ -236,7 +259,7 @@ func _make_sphere_layer(
 	mi.name = layer_name
 	mi.mesh = sphere
 	mi.material_override = mat
-	add_child(mi)
+	_planet_pivot.add_child(mi)
 
 
 func _create_atmosphere() -> void:
@@ -294,7 +317,7 @@ func _add_axis_line(
 	mi.mesh = cyl
 	mi.material_override = mat
 	mi.rotation_degrees = rotation_deg
-	add_child(mi)
+	_planet_pivot.add_child(mi)
 
 
 func _cam_up_local() -> Vector3:
