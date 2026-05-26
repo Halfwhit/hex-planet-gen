@@ -13,14 +13,12 @@ extends Node3D
 @export var sun_color: Color = Color(1.0, 0.92, 0.6, 1.0)
 ## Radius of the visible sun sphere in world units.
 @export var sun_size: float = 0.35
-## OmniLight3D brightness.
+## DirectionalLight3D brightness.
 @export var sun_light_energy: float = 28.0
-## OmniLight3D range — how far the light reaches.
-@export var sun_light_range: float = 40.0
 
 var _angle: float = 0.0
 var _planet_position: Vector3 = Vector3.ZERO
-var _light: OmniLight3D
+var _light: DirectionalLight3D
 var _mesh_instance: MeshInstance3D
 
 
@@ -62,11 +60,12 @@ func _build_sun() -> void:
 	add_child(_mesh_instance)
 
 	# ── Light ────────────────────────────────────────────────────────────────
-	_light = OmniLight3D.new()
+	# DirectionalLight3D gives parallel rays with no distance attenuation —
+	# correct for a star and avoids the cubemap shadow artifacts of OmniLight.
+	_light = DirectionalLight3D.new()
 	_light.name = "SunLight"
 	_light.light_color = sun_color
 	_light.light_energy = sun_light_energy
-	_light.omni_range = sun_light_range
 	_light.shadow_enabled = true
 	add_child(_light)
 
@@ -87,3 +86,8 @@ func _update_position() -> void:
 	var flat_y: float = sin(_angle) * sun_distance
 	var tilt: float = deg_to_rad(sun_inclination)
 	_planet_position = Vector3(flat_x, flat_y * sin(tilt), flat_y * cos(tilt))
+
+	# Point the directional light from the sun toward the planet so the lit
+	# hemisphere always faces the sun correctly.
+	if _light != null and _planet_position != Vector3.ZERO:
+		_light.look_at(_planet_position, Vector3.UP)

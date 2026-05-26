@@ -32,6 +32,8 @@ glow_bloom = 0.3
 transform = Transform3D(0.54923207, 0.8249365, -0.13350646, -0.82843506, 0.516507, -0.21660079, -0.109724864, 0.22956552, 0.9670885, 0, 0, 0)
 script = ExtResource("1_main")
 noise_seed = 4
+rotation_speed = 1.0
+days_per_orbit = 1
 mountain_height = 0.7
 
 [node name="PlanetMesh" type="MeshInstance3D" parent="." unique_id=1846582330]
@@ -64,6 +66,6 @@ script = ExtResource("3_0bbpv")
 transform = Transform3D(1, 2.7939677e-08, 0, 2.7939677e-08, 1, 0, -7.450581e-09, 0, 1, 0, 0, 0)
 script = ExtResource("4_rarhs")
 sun_distance = 80.0
+sun_orbit_speed = 1.0
 sun_size = 8.0
-sun_light_energy = 8.0
-sun_light_range = 200.0
+sun_light_energy = 16.0
