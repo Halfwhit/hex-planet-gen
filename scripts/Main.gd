@@ -99,14 +99,15 @@ func _ready() -> void:
 	_planet_pivot = Node3D.new()
 	_planet_pivot.name = "PlanetPivot"
 	add_child(_planet_pivot)
-	# Set initial position before any children are reparented so the planet
-	# never occupies the same space as the sun (which sits at world origin).
-	if has_node("Sun"):
-		_planet_pivot.global_position = ($Sun as Sun).get_planet_position()
 	_planet_mesh_instance.reparent(_planet_pivot, false)
 	_planet_mesh_instance.position = Vector3.ZERO
 	_orbit_camera.reparent(_planet_pivot, false)
 	_orbit_camera.position = Vector3.ZERO
+	# Set initial pivot position so the planet starts at orbital distance
+	# rather than at the sun's position (world origin).
+	var sun_node: Sun = get_node_or_null("Sun") as Sun
+	if sun_node:
+		_planet_pivot.position = sun_node.get_planet_position()
 
 	# Pre-tilt the planet mesh so its local Y axis (= the planet's north pole)
 	# points in the intended world-space direction.  All subsequent behaviour —
@@ -157,8 +158,10 @@ func _process(delta: float) -> void:
 		_orbit_camera.set_angles_from_dir((planet_basis * _lock_cell_local).normalized())
 
 	# Move the planet pivot to orbit the sun.
-	if _planet_pivot != null and has_node("Sun"):
-		_planet_pivot.global_position = ($Sun as Sun).get_planet_position()
+	if _planet_pivot != null:
+		var sun_node: Sun = get_node_or_null("Sun") as Sun
+		if sun_node:
+			_planet_pivot.position = sun_node.get_planet_position()
 
 
 func _editor_generate() -> void:
