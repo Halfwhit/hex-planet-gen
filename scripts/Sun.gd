@@ -35,6 +35,8 @@ func _ready() -> void:
 
 
 func _build_sun() -> void:
+	# The sun stays at world origin — the planet pivot moves, not this node.
+	position = Vector3.ZERO
 	# Clear stale children when the tool script re-runs in the editor.
 	for c: Node in get_children():
 		c.queue_free()
