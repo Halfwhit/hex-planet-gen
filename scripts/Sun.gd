@@ -14,7 +14,7 @@ extends Node3D
 ## Radius of the visible sun sphere in world units.
 @export var sun_size: float = 0.35
 ## OmniLight3D brightness.
-@export var sun_light_energy: float = 2.5
+@export var sun_light_energy: float = 20.0
 ## OmniLight3D range — how far the light reaches.
 @export var sun_light_range: float = 40.0
 
