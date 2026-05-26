@@ -98,10 +98,8 @@ func _ready() -> void:
 	# rather than keeping a separate _spin_axis variable.
 	_tilt_basis = Basis.from_euler(Vector3(0.0, 0.0, deg_to_rad(-axial_tilt)))
 	_planet_mesh_instance.basis = _tilt_basis
-	# Aim the light from the +Z side, perpendicular to true north (world Y).
-	# look_at_from_position keeps the light at a fixed world position so it
-	# never drifts with the planet's rotation or tilt.
-_generate_planet()
+	_generate_planet()
+
 	_create_atmosphere()
 	_create_axis_display()
 	_orbit_camera.set_distance_limits(planet_radius * 1.1, planet_radius * 6.0)
