@@ -101,8 +101,7 @@ func _ready() -> void:
 	# Aim the light from the +Z side, perpendicular to true north (world Y).
 	# look_at_from_position keeps the light at a fixed world position so it
 	# never drifts with the planet's rotation or tilt.
-	$DirectionalLight3D.look_at_from_position(Vector3(0.0, 0.0, 10.0), Vector3.ZERO, Vector3.UP)
-	_generate_planet()
+_generate_planet()
 	_create_atmosphere()
 	_create_axis_display()
 	_orbit_camera.set_distance_limits(planet_radius * 1.1, planet_radius * 6.0)
