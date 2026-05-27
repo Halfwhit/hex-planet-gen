@@ -169,7 +169,7 @@ func setup(camera: Camera3D) -> void:
 	_planet_gridmap.cell_occupied.connect(_on_cell_occupied)
 	_planet_gridmap.cell_vacated.connect(_on_cell_vacated)
 
-	_on_zoom_changed(camera.position.z if camera else planet_radius * 3.0)
+	notify_zoom_changed(camera.position.z if camera else planet_radius * 3.0)
 
 
 ## Returns the current world-space position of the planet pivot.
@@ -246,7 +246,9 @@ func _editor_generate() -> void:
 	_create_axis_display()
 
 
-func _on_zoom_changed(dist: float) -> void:
+## Called by Main whenever the orbit camera zoom distance changes while this
+## planet is focused. Switches the active LOD level if the distance crosses a threshold.
+func notify_zoom_changed(dist: float) -> void:
 	var new_lod: int = 0
 	for i: int in LOD_THRESHOLDS.size():
 		if dist <= LOD_THRESHOLDS[i] * planet_radius:

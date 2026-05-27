@@ -62,6 +62,9 @@ func _input(event: InputEvent) -> void:
 
 func _enter_solar_mode() -> void:
 	_camera_mode = MODE_SOLAR
+	# Disconnect zoom relay from any previously focused planet.
+	if _focused_planet != null and _orbit_camera.zoom_changed.is_connected(_focused_planet.notify_zoom_changed):
+		_orbit_camera.zoom_changed.disconnect(_focused_planet.notify_zoom_changed)
 	_focused_planet = null
 	_orbit_camera.snap_orbit_center(Vector3.ZERO)
 
@@ -78,12 +81,18 @@ func _enter_solar_mode() -> void:
 
 
 func _enter_focus_mode(planet) -> void:
+	# Disconnect zoom relay from the previously focused planet before switching.
+	if _focused_planet != null and _orbit_camera.zoom_changed.is_connected(_focused_planet.notify_zoom_changed):
+		_orbit_camera.zoom_changed.disconnect(_focused_planet.notify_zoom_changed)
 	_camera_mode = MODE_FOCUS
 	_focused_planet = planet
 	var r: float = planet.get_radius() as float
 	_orbit_camera.snap_orbit_center(planet.get_world_position())
 	_orbit_camera.set_distance_limits(r * 1.1, r * 6.0)
 	_orbit_camera.set_distance(r * 3.5)
+	# Relay zoom changes to the focused planet so its LOD updates while zooming.
+	_orbit_camera.zoom_changed.connect(planet.notify_zoom_changed)
+	planet.notify_zoom_changed(r * 3.5)
 	for p in _planets:
 		p.set_interactive(p == planet)
 
