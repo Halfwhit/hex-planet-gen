@@ -10,6 +10,7 @@ const LOD_THRESHOLDS: Array[float] = [3.5, 2.5, 2.0]
 
 const _HORIZON_SHADER: Shader = preload("res://shaders/HorizonMask.gdshader")
 const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
+const _PLANET_SHADER: Shader = preload("res://shaders/Planet.gdshader")
 
 
 @export_group("Orbit")
@@ -25,6 +26,9 @@ const _ATMOSPHERE_SHADER: Shader = preload("res://shaders/Atmosphere.gdshader")
 @export_group("Planet")
 ## Radius of the planet sphere in world units; scales all LOD switch distances and atmosphere layers.
 @export var planet_radius: float = 2.0
+## Visual radius of the sun sphere. Used to compute the sun's apparent angular size
+## (sun_radius / orbit_distance), which controls how wide the soft terminator is.
+@export var sun_radius: float = 8.0
 ## Fraction of the planet surface that will be ocean (0 = all land, 1 = all ocean).
 @export_range(0.0, 1.0) var ocean_fraction: float = 0.55
 ## Deterministic seed passed to all noise generators; change to get a different planet.
@@ -135,8 +139,10 @@ func _ready() -> void:
 	_planet_mesh_instance.basis = _tilt_basis
 
 	_generate_planet()
+	_apply_planet_shader()
 	_create_atmosphere()
 	_create_axis_display()
+	_create_orbit_ring()
 
 	# LocalMap lives in a CanvasLayer child of Planet.
 	var map_layer: CanvasLayer = CanvasLayer.new()
@@ -341,6 +347,50 @@ func _create_axis_display() -> void:
 			planet_radius * 0.008)
 
 
+func _apply_planet_shader() -> void:
+	# material_override persists when _planet_mesh_instance.mesh is swapped for
+	# a different LOD level, so we only need to set it once here.
+	var mat: ShaderMaterial = ShaderMaterial.new()
+	mat.shader = _PLANET_SHADER
+	mat.set_shader_parameter("sun_angular_size",
+			sun_radius / max(orbit_distance, 0.001))
+	_planet_mesh_instance.material_override = mat
+
+
+func _create_orbit_ring() -> void:
+	# Dotted circle at orbit_distance from the sun (world origin).
+	# Added as a direct child of the Planet node (not _planet_pivot) so it
+	# stays fixed in space while the planet moves around it.
+	const SEGMENTS: int = 120
+	const DOT_LEN: int = 3
+	const GAP_LEN: int = 2
+
+	var st: SurfaceTool = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_LINES)
+	for i: int in SEGMENTS:
+		if i % (DOT_LEN + GAP_LEN) >= DOT_LEN:
+			continue
+		var a0: float = TAU * float(i) / float(SEGMENTS)
+		var a1: float = TAU * float(i + 1) / float(SEGMENTS)
+		st.add_vertex(Vector3(cos(a0) * orbit_distance, 0.0, sin(a0) * orbit_distance))
+		st.add_vertex(Vector3(cos(a1) * orbit_distance, 0.0, sin(a1) * orbit_distance))
+
+	var mat: StandardMaterial3D = StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.9, 0.9, 1.0, 0.35)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.no_depth_test = true
+	mat.render_priority = 1
+
+	var mi: MeshInstance3D = MeshInstance3D.new()
+	mi.name = "OrbitRing"
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	# Tilt the ring to match orbit_inclination (rotation around world X).
+	mi.rotation_degrees = Vector3(orbit_inclination, 0.0, 0.0)
+	add_child(mi)
+
+
 func _add_axis_line(
 		line_name: String,
 		half_length: float,
@@ -361,6 +411,8 @@ func _add_axis_line(
 	mat.emission = color
 	mat.emission_energy_multiplier = 1.2
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.render_priority = 1
 
 	var mi: MeshInstance3D = MeshInstance3D.new()
 	mi.name = line_name

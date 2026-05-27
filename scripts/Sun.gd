@@ -17,6 +17,9 @@ extends Node3D
 @export var sun_light_energy: float = 50.0
 ## OmniLight3D range — must exceed orbital distance.
 @export var sun_light_range: float = 200.0
+## Shadow softness (PCSS light-source size). Higher = softer penumbra that
+## naturally scales with caster-to-receiver distance in Forward+.
+@export_range(0.0, 4.0) var shadow_blur: float = 2.0
 
 const _EMISSION_ENERGY: float = 6.0
 
@@ -67,14 +70,16 @@ func _build_sun() -> void:
 
 	# ── Light ────────────────────────────────────────────────────────────────
 	# OmniLight3D at the sun's position naturally illuminates the correct
-	# hemisphere with no rotation needed.  Shadows disabled to avoid the
-	# cubemap shadow artifacts that are visible when zoomed in close.
+	# hemisphere with no rotation needed.  shadow_blur > 0 activates PCSS in
+	# Forward+, which makes the penumbra size scale with caster-to-receiver
+	# distance — closer planets cast hard shadows, distant ones cast soft ones.
 	_light = OmniLight3D.new()
 	_light.name = "SunLight"
 	_light.light_color = sun_color
 	_light.light_energy = sun_light_energy
 	_light.omni_range = sun_light_range
-	_light.shadow_enabled = false
+	_light.shadow_enabled = true
+	_light.shadow_blur = shadow_blur
 	add_child(_light)
 
 	_update_position()

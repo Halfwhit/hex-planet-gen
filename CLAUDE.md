@@ -17,8 +17,10 @@ Godot 4 procedural planet generator. A sphere is tiled with a Goldberg polyhedra
 | `PlanetGridmap.gd` | Cell picking, hover/select outlines, occupation (fill meshes), and neighbour graph. Only active at LOD 3. Builds the adjacency graph from shared polygon vertices once per `setup()` call. |
 | `LocalMap.gd` | 2D CanvasLayer panel. Shows a flat-top hex minimap of the ring-1 (and optionally ring-N) neighbours around an occupied cell. Orientation is always aligned with the camera view. |
 | `OrbitCamera.gd` | Node3D with Camera3D child. Mouse-drag orbit, scroll zoom, idle auto-orbit, and north-roll correction that keeps orbital north (world Y) at the top of the screen. |
-| `Main.gd` | Scene controller. Owns LOD mesh/cell arrays, planet spin (explicit basis rebuild each frame), atmosphere + axis display, LOD switching, and local-map wiring. `@tool` for in-editor preview. |
-| `Sun.gd` | `@tool` Node3D that manages the emissive sun sphere, OmniLight3D, and orbital position computation. Exposes `get_planet_position()` which Main reads each frame to move `_planet_pivot`. The sun stays at world origin; only the planet pivot moves. |
+| `Planet.gd` | Self-contained planet node. Owns orbit (self-computed each frame), spin, LOD mesh/cell arrays, atmosphere, axis display, orbit ring, soft-terminator shader, and local-map wiring. `@tool` for in-editor preview. Multiple Planet nodes can coexist as siblings under Main. |
+| `Main.gd` | Solar-system scene controller. Discovers Planet children via `has_method("get_world_position")`, sets up cameras, handles click-to-focus and solar/focus camera modes. Thin — no planet-specific logic. |
+| `Sun.gd` | `@tool` Node3D at world origin. Manages the emissive sun sphere and OmniLight3D (PCSS shadows via `shadow_blur`). The sun does not move; planets orbit it via their own `orbit_distance` export. |
+| `shaders/Planet.gdshader` | Soft-terminator surface shader. Reads vertex colours as albedo; replaces Lambertian N·L with `smoothstep(-sun_angular_size, sun_angular_size, n_dot_l)` so the day/night boundary widens for close planets and sharpens for distant ones. |
 | `shaders/HorizonMask.gdshader` | `blend_mix` sphere at 1.025× radius. Covers polygon edges at the silhouette so flat hex tiles don't appear to float past the horizon. |
 | `shaders/Atmosphere.gdshader` | `blend_add` sphere at 1.08× radius. Soft rim glow beyond the planet disc. |
 
@@ -102,29 +104,44 @@ Both `PlanetMesh.build()` and `LocalMap._draw()` call `PlanetMesh.terrain_color(
 
 `planet_gridmap.occupation_radius` and `_local_map.rings` are both set from `Main.map_rings`. This enforces that two occupied cells are always at least `map_rings` hops apart (guaranteeing no overlap in their displayed local maps). Keep these in sync.
 
-### 17. `_planet_pivot` owns all planet visuals; `sun_orbit_speed` is derived
+### 17. `_planet_pivot` owns all planet visuals; planet self-orbits the sun
 
-`_planet_pivot` is created in `Main._ready()` and is the parent of all planet visuals (mesh, atmosphere, axis lines, orbit camera). Moving `_planet_pivot` moves everything uniformly. Every frame `Main._process()` calls `_sun.get_planet_position()` and assigns the result to `_planet_pivot.position`, so the planet orbits the stationary sun at world origin.
+`_planet_pivot` is created in `Planet._ready()` and is the parent of all planet visuals (mesh, atmosphere, axis lines). Moving `_planet_pivot` moves everything uniformly. Every frame `Planet._process()` advances `_orbit_angle` and calls `_update_orbit_position()` which sets `_planet_pivot.position` directly from `orbit_distance` and `orbit_inclination`. The sun stays at world origin; all planets orbit it independently.
 
-`_sun.sun_orbit_speed` is set from `rotation_speed / days_per_orbit` so spin and orbit are always proportional — one full orbit takes exactly `days_per_orbit` planet rotations. Do not set `sun_orbit_speed` independently; always derive it via this ratio.
+The orbit ring (`OrbitRing` MeshInstance3D) is a direct child of the **Planet node** (not `_planet_pivot`) so it stays fixed in world space while the planet pivot moves around it.
+
+### 18. Planet shader terminator width is set once at startup from orbit distance
+
+`Planet._apply_planet_shader()` creates a `ShaderMaterial` using `Planet.gdshader` and sets `sun_angular_size = sun_radius / orbit_distance`. This is set as `material_override` on `_planet_mesh_instance` and persists across LOD mesh swaps. Do not set per-surface materials on planet LOD meshes — the `material_override` will take precedence, and per-surface materials from `PlanetMesh.build()` are intentionally shadowed by it.
+
+`sun_angular_size` controls how wide the day/night terminator is: larger values (close orbit) produce a wide soft twilight band; smaller values (distant orbit) produce a sharp terminator. It is not updated at runtime because `orbit_distance` is a fixed export.
+
+### 19. Soft shadow PCSS via `shadow_blur` on the OmniLight3D
+
+`Sun._build_sun()` sets `_light.shadow_blur = shadow_blur` (exported, default 2.0). In Godot 4 Forward+, `shadow_blur > 0` activates PCSS: the penumbra size scales with blocker-to-receiver distance, so planets close together cast harder shadows on each other than planets far apart. Do not set `shadow_enabled = false` — planet-on-planet shadows are intentional. Tune `shadow_blur` in the Inspector on the Sun node.
 
 ---
 
 ## Generation pipeline
 
 ```
-Main._generate_planet()
-  └─ _make_noise()                       FastNoiseLite (seed, freq, octaves)
-  └─ for sub in [2, 3, 4, 5]:
-       IcoSphere.generate(sub)           icosahedron + sub subdivision passes
-       HexPlanet.generate(ico, noise, …)
-         ├─ _build_tectonic_heights()    plates → Bellman-Ford elevation
-         ├─ sorted percentile → land_threshold
-         ├─ pass 1: height / type / polygon per cell
-         ├─ flood-fill lake detection    (PackedInt32Array BFS)
-         └─ pass 2: temperature / moisture / biome per cell
-       PlanetMesh.build(planet, r)       SurfaceTool → ArrayMesh
-       _lod_cells.append(planet.cells)
+Planet._ready()
+  └─ _generate_planet()
+       └─ _make_noise()                       FastNoiseLite (seed, freq, octaves)
+       └─ for sub in [2, 3, 4, 5]:
+            IcoSphere.generate(sub)           icosahedron + sub subdivision passes
+            HexPlanet.generate(ico, noise, …)
+              ├─ _build_tectonic_heights()    plates → Bellman-Ford elevation
+              ├─ sorted percentile → land_threshold
+              ├─ pass 1: height / type / polygon per cell
+              ├─ flood-fill lake detection    (PackedInt32Array BFS)
+              └─ pass 2: temperature / moisture / biome per cell
+            PlanetMesh.build(planet, r)       SurfaceTool → ArrayMesh
+            _lod_cells.append(planet.cells)
+  └─ _apply_planet_shader()              ShaderMaterial with sun_angular_size
+  └─ _create_atmosphere()               HorizonMask + Atmosphere sphere layers
+  └─ _create_axis_display()             RotationAxis + TrueNorthAxis cylinders
+  └─ _create_orbit_ring()               dotted PRIMITIVE_LINES circle at orbit_distance
 ```
 
 LOD switching is purely mesh-swapping on `planet_mesh_instance.mesh`; the four meshes are held in `_lod_meshes: Array[ArrayMesh]` and the four cell arrays in `_lod_cells: Array` (plain untyped array — see gotcha below). Neither is regenerated at runtime. LOD switch calls `planet_gridmap.setup()` with real cells only at LOD 3 (empty array otherwise) and clears the local map.

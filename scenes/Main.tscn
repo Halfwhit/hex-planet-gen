@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://d3c1h5takgjoq" path="res://scripts/OrbitCamera.gd" id="2_orbit"]
 [ext_resource type="Script" uid="uid://du1nqbmwh52vn" path="res://scripts/PlanetGridmap.gd" id="3_0bbpv"]
 [ext_resource type="Script" uid="uid://cis3s82hapwwc" path="res://scripts/Sun.gd" id="4_rarhs"]
-[ext_resource type="Script" path="res://scripts/Planet.gd" id="4_vcsgt"]
+[ext_resource type="Script" uid="uid://dfe355yhxbhhg" path="res://scripts/Planet.gd" id="4_vcsgt"]
 
 [sub_resource type="Environment" id="Environment_vcsgt"]
 ambient_light_source = 2
@@ -34,10 +34,6 @@ _surfaces = [{
 [node name="Main" type="Node3D" unique_id=171713847]
 transform = Transform3D(0.54923207, 0.8249365, -0.13350646, -0.82843506, 0.516507, -0.21660079, -0.109724864, 0.22956552, 0.9670885, 0, 0, 0)
 script = ExtResource("1_main")
-noise_seed = 4
-rotation_speed = 1.0
-days_per_orbit = 1
-mountain_height = 0.7
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1657244967]
 environment = SubResource("Environment_vcsgt")
@@ -66,12 +62,64 @@ sun_distance = 80.0
 sun_orbit_speed = 1.0
 sun_size = 8.0
 sun_light_energy = 16.0
+shadow_blur = 4.0
 
-[node name="Planet" type="Node3D" parent="." unique_id=262269065]
+[node name="Planet1" type="Node3D" parent="." unique_id=262269065]
 script = ExtResource("4_vcsgt")
+orbit_distance = 22.0
 
-[node name="PlanetMesh" type="MeshInstance3D" parent="Planet" unique_id=1846582330]
+[node name="PlanetMesh" type="MeshInstance3D" parent="Planet1" unique_id=1846582330]
 mesh = SubResource("ArrayMesh_rarhs")
 
-[node name="PlanetGridmap" type="Node3D" parent="Planet" unique_id=1290638922]
+[node name="PlanetGridmap" type="Node3D" parent="Planet1" unique_id=1290638922]
+script = ExtResource("3_0bbpv")
+
+[node name="Planet2" type="Node3D" parent="." unique_id=1039789480]
+script = ExtResource("4_vcsgt")
+orbit_speed = 5.2
+orbit_phase = 90.0
+planet_radius = 1.4
+ocean_fraction = 0.15
+noise_seed = 11
+axial_tilt = 3.0
+atmosphere_color = Color(1, 0.55, 0.25, 1)
+horizon_mask_color = Color(0.55, 0.35, 0.2, 1)
+
+[node name="PlanetMesh" type="MeshInstance3D" parent="Planet2" unique_id=1635640787]
+
+[node name="PlanetGridmap" type="Node3D" parent="Planet2" unique_id=1066960132]
+script = ExtResource("3_0bbpv")
+
+[node name="Planet3" type="Node3D" parent="." unique_id=1560390409]
+script = ExtResource("4_vcsgt")
+orbit_distance = 32.0
+orbit_speed = 1.4
+orbit_phase = 180.0
+planet_radius = 2.4
+ocean_fraction = 0.72
+noise_seed = 99
+axial_tilt = 97.8
+atmosphere_color = Color(0.55, 0.75, 1, 1)
+horizon_mask_color = Color(0.4, 0.5, 0.6, 1)
+
+[node name="PlanetMesh" type="MeshInstance3D" parent="Planet3" unique_id=714544462]
+
+[node name="PlanetGridmap" type="Node3D" parent="Planet3" unique_id=12311748]
+script = ExtResource("3_0bbpv")
+
+[node name="Planet4" type="Node3D" parent="." unique_id=1076734512]
+script = ExtResource("4_vcsgt")
+orbit_distance = 45.0
+orbit_speed = 0.6
+orbit_phase = 270.0
+planet_radius = 3.6
+ocean_fraction = 0.9
+noise_seed = 7
+axial_tilt = 12.0
+atmosphere_color = Color(0.4, 0.6, 0.9, 1)
+horizon_mask_color = Color(0.2, 0.3, 0.5, 1)
+
+[node name="PlanetMesh" type="MeshInstance3D" parent="Planet4" unique_id=1158418565]
+
+[node name="PlanetGridmap" type="Node3D" parent="Planet4" unique_id=1903581436]
 script = ExtResource("3_0bbpv")
