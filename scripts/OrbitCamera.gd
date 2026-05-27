@@ -16,6 +16,8 @@ signal drag_started
 @export var idle_orbit_speed: float = 0.08
 ## Seconds of inactivity before idle orbit begins.
 @export var idle_delay: float = 4.0
+## Lerp speed (units/s) for orbit center transitions.
+@export var transition_speed: float = 5.0
 
 var _dragging: bool = false
 var _distance: float = 5.0
@@ -24,6 +26,9 @@ var _yaw: float = 0.0
 var _idle_timer: float = 0.0
 var _north: Vector3 = Vector3.UP
 var _angles_dirty: bool = true
+var _orbit_center: Vector3 = Vector3.ZERO
+var _orbit_center_target: Vector3 = Vector3.ZERO
+var _transitioning: bool = false
 
 @onready var camera: Camera3D = $Camera3D
 
@@ -40,6 +45,13 @@ func _process(delta: float) -> void:
 		if _idle_timer > idle_delay:
 			_yaw += idle_orbit_speed * delta
 			_angles_dirty = true
+	# Lerp orbit center toward target when a transition is active.
+	if _transitioning:
+		_orbit_center = _orbit_center.lerp(_orbit_center_target, clamp(transition_speed * delta, 0.0, 1.0))
+		if _orbit_center.distance_to(_orbit_center_target) < 0.001:
+			_orbit_center = _orbit_center_target
+			_transitioning = false
+		_apply_transform()
 	# Apply north roll only when angles have changed.  Uses _pitch/_yaw directly
 	# to avoid reading a potentially-stale global_transform after a rotation write.
 	if _angles_dirty:
@@ -107,6 +119,25 @@ func set_distance_limits(p_min: float, p_max: float) -> void:
 	_set_distance(_distance)
 
 
+## Begin a smooth transition of the orbit center to the given world-space target.
+func set_orbit_center(target: Vector3) -> void:
+	_orbit_center_target = target
+	_transitioning = true
+
+
+## Instantly move the orbit center to the given position with no lerp.
+func snap_orbit_center(center: Vector3) -> void:
+	_orbit_center = center
+	_orbit_center_target = center
+	_transitioning = false
+	_apply_transform()
+
+
+## Directly set the camera distance (public wrapper for _set_distance).
+func set_distance(d: float) -> void:
+	_set_distance(d)
+
+
 func _update_north_roll() -> void:
 	# Build the zero-roll basis directly from _pitch/_yaw so we never touch
 	# global_transform (which may lag one frame after a rotation write).
@@ -120,6 +151,9 @@ func _update_north_roll() -> void:
 
 
 func _apply_transform() -> void:
+	# Move this node to the orbit center in world space so the camera orbits
+	# the correct focal point regardless of the scene's node hierarchy.
+	global_position = _orbit_center
 	if camera:
 		camera.position = Vector3(0.0, 0.0, _distance)
 
